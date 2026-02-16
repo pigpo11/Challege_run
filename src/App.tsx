@@ -268,21 +268,22 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
 
               <div className="pb-grid">
                 <div className="pb-item">
-                  <span className="pb-dist bold">1K</span>
-                  <span className="pb-time">{userInfo.pbs.k1}</span>
+                  <span className="pb-dist bold">1KM</span>
+                  <span className="pb-time">{userInfo.pbs['1KM']}</span>
                 </div>
                 <div className="pb-item">
-                  <span className="pb-dist bold">3K</span>
-                  <span className="pb-time">{userInfo.pbs.k3}</span>
+                  <span className="pb-dist bold">3KM</span>
+                  <span className="pb-time">{userInfo.pbs['3KM']}</span>
                 </div>
                 <div className="pb-item">
-                  <span className="pb-dist bold">5K</span>
-                  <span className="pb-time">{userInfo.pbs.k5}</span>
+                  <span className="pb-dist bold">5KM</span>
+                  <span className="pb-time">{userInfo.pbs['5KM']}</span>
                 </div>
                 <div className="pb-item">
-                  <span className="pb-dist bold">10K</span>
-                  <span className="pb-time">{userInfo.pbs.k10}</span>
+                  <span className="pb-dist bold">10KM</span>
+                  <span className="pb-time">{userInfo.pbs['10KM']}</span>
                 </div>
+
               </div>
             </div>
           </div>
@@ -342,21 +343,22 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
 
               <div className="pb-grid">
                 <div className="pb-item">
-                  <span className="pb-dist">1K</span>
-                  <span className="pb-time">{userInfo.pbs.k1}</span>
+                  <span className="pb-dist">1KM</span>
+                  <span className="pb-time">{userInfo.pbs['1KM']}</span>
                 </div>
                 <div className="pb-item">
-                  <span className="pb-dist">3K</span>
-                  <span className="pb-time">{userInfo.pbs.k3}</span>
+                  <span className="pb-dist">3KM</span>
+                  <span className="pb-time">{userInfo.pbs['3KM']}</span>
                 </div>
                 <div className="pb-item">
-                  <span className="pb-dist">5K</span>
-                  <span className="pb-time">{userInfo.pbs.k5}</span>
+                  <span className="pb-dist">5KM</span>
+                  <span className="pb-time">{userInfo.pbs['5KM']}</span>
                 </div>
                 <div className="pb-item">
-                  <span className="pb-dist">10K</span>
-                  <span className="pb-time">{userInfo.pbs.k10}</span>
+                  <span className="pb-dist">10KM</span>
+                  <span className="pb-time">{userInfo.pbs['10KM']}</span>
                 </div>
+
               </div>
             </div>
             <div className="stat-card">
@@ -531,7 +533,7 @@ const RankingView = ({ currentGroupId, userInfo }: { currentGroupId: string | nu
   );
 };
 
-const PBInputItem = ({ label, value, onChange }: { label: string, value: { min: string, sec: string }, onChange: (v: { min: string, sec: string }) => void }) => (
+const PBInputItem = ({ label, id, value, onChange }: { label: string, id: string, value: { min: string, sec: string }, onChange: (v: { min: string, sec: string }) => void }) => (
   <div className="pb-input-item-v2">
     <label>{label}</label>
     <div className="pb-time-picker-v2">
@@ -540,11 +542,18 @@ const PBInputItem = ({ label, value, onChange }: { label: string, value: { min: 
         placeholder="00"
         className="pb-num-input-v2 no-spinner"
         value={value.min}
-        onChange={(e) => onChange({ ...value, min: e.target.value.slice(0, 2) })}
+        onChange={(e) => {
+          const val = e.target.value.slice(0, 2);
+          onChange({ ...value, min: val });
+          if (val.length === 2) {
+            document.getElementById(`pb-sec-${id}`)?.focus();
+          }
+        }}
         onFocus={(e) => e.target.select()}
       />
       <span className="pb-time-separator-v2">'</span>
       <input
+        id={`pb-sec-${id}`}
         type="number"
         placeholder="00"
         className="pb-num-input-v2 no-spinner"
@@ -557,7 +566,9 @@ const PBInputItem = ({ label, value, onChange }: { label: string, value: { min: 
   </div>
 );
 
-const ProfileView = ({ team, missions, userInfo, onUpdate }: { team: Team | null, missions: Mission[], userInfo: any, onUpdate: (n: string, s: string, p: string | null, d: string, pbs: any, goal?: string) => void }) => {
+
+const ProfileView = ({ team, missions, userInfo, onUpdate, onEditMission }: { team: Team | null, missions: Mission[], userInfo: any, onUpdate: (n: string, s: string, p: string | null, d: string, pbs: any, goal?: string) => void, onEditMission: (m: Mission) => void }) => {
+
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(userInfo.name);
@@ -585,19 +596,20 @@ const ProfileView = ({ team, missions, userInfo, onUpdate }: { team: Team | null
   };
 
   const [editPbs, setEditPbs] = useState({
-    k1: parsePB(userInfo.pbs.k1),
-    k3: parsePB(userInfo.pbs.k3),
-    k5: parsePB(userInfo.pbs.k5),
-    k10: parsePB(userInfo.pbs.k10),
+    '1KM': parsePB(userInfo.pbs['1KM']),
+    '3KM': parsePB(userInfo.pbs['3KM']),
+    '5KM': parsePB(userInfo.pbs['5KM']),
+    '10KM': parsePB(userInfo.pbs['10KM']),
   });
 
   const handleSave = () => {
     const finalPbs = {
-      k1: formatPB(editPbs.k1.min, editPbs.k1.sec),
-      k3: formatPB(editPbs.k3.min, editPbs.k3.sec),
-      k5: formatPB(editPbs.k5.min, editPbs.k5.sec),
-      k10: formatPB(editPbs.k10.min, editPbs.k10.sec),
+      '1KM': formatPB(editPbs['1KM'].min, editPbs['1KM'].sec),
+      '3KM': formatPB(editPbs['3KM'].min, editPbs['3KM'].sec),
+      '5KM': formatPB(editPbs['5KM'].min, editPbs['5KM'].sec),
+      '10KM': formatPB(editPbs['10KM'].min, editPbs['10KM'].sec),
     };
+
     onUpdate(editName, editStatus, editPic, editDist, finalPbs, editGoal);
     setIsEditing(false);
   };
@@ -662,21 +674,23 @@ const ProfileView = ({ team, missions, userInfo, onUpdate }: { team: Team | null
             <div className="record-divider-v2 my-24" />
 
             <div className="pb-input-grid-v2">
-              <PBInputItem label="1K PB" value={editPbs.k1} onChange={(v) => setEditPbs({ ...editPbs, k1: v })} />
-              <PBInputItem label="3K PB" value={editPbs.k3} onChange={(v) => setEditPbs({ ...editPbs, k3: v })} />
-              <PBInputItem label="5K PB" value={editPbs.k5} onChange={(v) => setEditPbs({ ...editPbs, k5: v })} />
-              <PBInputItem label="10K PB" value={editPbs.k10} onChange={(v) => setEditPbs({ ...editPbs, k10: v })} />
+              <PBInputItem id="1KM" label="1KM PB" value={editPbs['1KM']} onChange={(v) => setEditPbs({ ...editPbs, '1KM': v })} />
+              <PBInputItem id="3KM" label="3KM PB" value={editPbs['3KM']} onChange={(v) => setEditPbs({ ...editPbs, '3KM': v })} />
+              <PBInputItem id="5KM" label="5KM PB" value={editPbs['5KM']} onChange={(v) => setEditPbs({ ...editPbs, '5KM': v })} />
+              <PBInputItem id="10KM" label="10KM PB" value={editPbs['10KM']} onChange={(v) => setEditPbs({ ...editPbs, '10KM': v })} />
             </div>
+
 
             <div className="flex gap-12 mt-32">
               <button className="btn-dark flex-1 bold" style={{ background: '#2c2c2e', color: '#8e8e93', border: 'none', borderRadius: '14px', padding: '16px' }} onClick={() => {
                 // Reset state on cancel
                 setEditPbs({
-                  k1: parsePB(userInfo.pbs.k1),
-                  k3: parsePB(userInfo.pbs.k3),
-                  k5: parsePB(userInfo.pbs.k5),
-                  k10: parsePB(userInfo.pbs.k10),
+                  '1KM': parsePB(userInfo.pbs['1KM']),
+                  '3KM': parsePB(userInfo.pbs['3KM']),
+                  '5KM': parsePB(userInfo.pbs['5KM']),
+                  '10KM': parsePB(userInfo.pbs['10KM']),
                 });
+
                 setEditGoal(userInfo.monthlyGoal);
                 setIsEditing(false);
 
@@ -725,22 +739,23 @@ const ProfileView = ({ team, missions, userInfo, onUpdate }: { team: Team | null
 
             <div className="pb-grid">
               <div className="pb-item">
-                <span className="pb-dist">1K</span>
-                <span className="pb-time">{userInfo.pbs.k1}</span>
+                <span className="pb-dist">1KM</span>
+                <span className="pb-time">{userInfo.pbs['1KM']}</span>
               </div>
               <div className="pb-item">
-                <span className="pb-dist">3K</span>
-                <span className="pb-time">{userInfo.pbs.k3}</span>
+                <span className="pb-dist">3KM</span>
+                <span className="pb-time">{userInfo.pbs['3KM']}</span>
               </div>
               <div className="pb-item">
-                <span className="pb-dist">5K</span>
-                <span className="pb-time">{userInfo.pbs.k5}</span>
+                <span className="pb-dist">5KM</span>
+                <span className="pb-time">{userInfo.pbs['5KM']}</span>
               </div>
               <div className="pb-item">
-                <span className="pb-dist">10K</span>
-                <span className="pb-time">{userInfo.pbs.k10}</span>
+                <span className="pb-dist">10KM</span>
+                <span className="pb-time">{userInfo.pbs['10KM']}</span>
               </div>
             </div>
+
           </div>
           <div className="stat-card">
             <div className="stat-card-header">
@@ -781,45 +796,79 @@ const ProfileView = ({ team, missions, userInfo, onUpdate }: { team: Team | null
 
       {/* Menu Sections */}
       <div className="menu-group-container mt-40">
-        <div className="px-20 mb-12">
-          <h3 className="section-title-alt">기록 히스토리</h3>
+        <div className="px-20 mb-20 flex-between">
+          <h3 className="section-title-alt">인증 히스토리</h3>
         </div>
-        <div className="menu-list-wrap">
-          {myHistory.length > 0 ? (
-            myHistory.map(m => (
-              <div key={m.id} className="menu-item-premium px-20 py-20 border-b">
-                <div className="flex-between">
-                  <div>
-                    <div className="flex items-center gap-8">
-                      <span className={`font-10 bold px-6 py-2 rounded-4 ${m.type === '개인 러닝' ? 'bg-green-dim text-green' : 'bg-blue-dim text-blue'}`}>
-                        {m.type}
-                      </span>
-                      {m.type !== '개인 러닝' && <p className="text-white font-14 bold">{m.week}주차</p>}
-                    </div>
 
-                    <p className="text-gray-600 font-11 mt-6">{m.timestamp}</p>
-                  </div>
-                  <div className="text-right">
-                    {m.type === '개인 러닝' ? (
-                      <p className="text-white font-16 bold">{m.distance} <span className="font-12 text-gray-500">km</span></p>
-                    ) : (
-                      <div className="flex flex-col gap-2">
-                        {Object.entries(m.records || {}).slice(0, 2).map(([key, val]) => (
-                          <p key={key} className="text-green font-12 bold">{key}: {val}</p>
-                        ))}
+        <div className="history-container-visual">
+          {myHistory.length > 0 ? (() => {
+            const grouped = myHistory.reduce((acc: any, m) => {
+              const date = (m.timestamp || '').split('오전')[0].split('오후')[0].trim() || '날짜 미상';
+              if (!acc[date]) acc[date] = [];
+              acc[date].push(m);
+              return acc;
+            }, {});
+
+
+            const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+            return sortedDates.map(date => (
+              <div key={date} className="history-date-group">
+                <h4 className="history-date-header-v2">{date}</h4>
+                <div className="history-visual-grid">
+                  {grouped[date].map((m: Mission) => {
+                    const firstImage = m.images && m.images.length > 0 ? m.images[0] : null;
+                    const recordEntries = Object.entries(m.records || {}).filter(([_, v]) => v);
+                    let recordSummary = '';
+                    if (m.type === '개인 러닝') {
+                      recordSummary = `${m.distance}km`;
+                    } else if (recordEntries.length > 0) {
+                      const [key, val] = recordEntries[0];
+                      recordSummary = `${key} ${val}`;
+                    }
+
+                    return (
+                      <div key={m.id} className={`history-visual-tile ${m.status}`} onClick={() => m.status === 'pending' && onEditMission(m)}>
+                        {firstImage ? (
+                          <img src={firstImage} alt="History" className="history-tile-img" />
+                        ) : (
+                          <div className="history-tile-placeholder">
+                            <Activity size={18} color="#48484a" />
+                          </div>
+                        )}
+                        <div className="history-tile-overlay">
+                          <span className="history-tile-type">{m.type === '개인 러닝' ? '개인 러닝' : `인증 ${m.week}주차`}</span>
+                          <span className="history-tile-record-summary">{recordSummary}</span>
+                        </div>
+                        {m.status === 'pending' ? (
+                          <button
+                            className="history-tile-edit-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditMission(m);
+                            }}
+                          >
+                            <Edit2 size={10} />
+                            수정
+                          </button>
+
+                        ) : (
+                          <div className={`history-tile-status-dot ${m.status}`} />
+                        )}
                       </div>
-                    )}
-                  </div>
+
+                    );
+                  })}
                 </div>
               </div>
-            ))
-
-          ) : (
+            ));
+          })() : (
             <div className="empty-history-premium py-40">
               <p className="text-gray-700 font-14">아직 인증된 기록이 없습니다.</p>
             </div>
           )}
         </div>
+
 
         <div className="px-20 mt-40 mb-12">
           <h3 className="section-title-alt">서비스 설정</h3>
@@ -960,14 +1009,17 @@ const DistanceExtractor = ({ onExtract, onImageSelect, distance, setDistance, is
 
 
 
-const MissionInputView = ({ onBack, onSubmit, isGroup, challenge }: { onBack: () => void, onSubmit: (r: any, p: string[], d: string) => void, isGroup: boolean, challenge?: WeeklyChallenge }) => {
-  const [records, setRecords] = useState<any>({});
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [runDistance, setRunDistance] = useState<string>('0');
+const MissionInputView = ({ onBack, onSubmit, isGroup, challenge, initialMission }: { onBack: () => void, onSubmit: (r: any, p: string[], d: string) => void, isGroup: boolean, challenge?: WeeklyChallenge, initialMission?: Mission }) => {
+  const [records, setRecords] = useState<any>(initialMission?.records || {});
+  const [photos, setPhotos] = useState<string[]>(initialMission?.images || []);
+  const [runDistance, setRunDistance] = useState<string>(initialMission ? String(initialMission.distance) : '0');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize records based on challenge fields
+  // Initialize records based on challenge fields if not editing
   useEffect(() => {
+    if (initialMission) return;
+
     if (challenge?.recordFields) {
       const initialRecords: any = {};
       challenge.recordFields.forEach(f => initialRecords[f.id] = '');
@@ -977,7 +1029,8 @@ const MissionInputView = ({ onBack, onSubmit, isGroup, challenge }: { onBack: ()
       setRecords({ '1KM': '' });
     }
 
-  }, [challenge]);
+  }, [challenge, initialMission]);
+
 
   const parseMin = (val: string) => {
     if (!val) return '';
@@ -1040,13 +1093,22 @@ const MissionInputView = ({ onBack, onSubmit, isGroup, challenge }: { onBack: ()
           <ChevronLeft size={24} className="text-white" />
           <h2 className="text-white font-24 bold tracking-tight">기록 인증하기</h2>
         </div>
-        <p className="text-gray-500 font-14 leading-relaxed">거리가 포함된 러닝 인증 사진을 추가해 주세요.<br />인식된 거리는 마일리지에 즉시 반영됩니다. ⚡️</p>
+        <p className="text-gray-500 font-14 leading-relaxed">
+          {isGroup
+            ? <>챌린지 인증 사진을 추가해 주세요.<br />그룹장의 승인 후에 커뮤니티에 업로드 됩니다.⚡️</>
+            : <>거리가 포함된 러닝 인증 사진을 추가해 주세요.<br />인식된 거리는 마일리지에 즉시 반영됩니다.⚡️</>
+          }
+
+        </p>
+
       </div>
 
       <div className="flex-1 overflow-y-auto pb-40 no-scrollbar">
-        <DistanceExtractor onExtract={handleExtractedDistance} onImageSelect={handleExtractedImage} distance={runDistance} setDistance={setRunDistance} isGroup={isGroup} />
+        {!isGroup && (
+          <DistanceExtractor onExtract={handleExtractedDistance} onImageSelect={handleExtractedImage} distance={runDistance} setDistance={setRunDistance} isGroup={isGroup} />
+        )}
 
-        <div className="mt-8">
+        <div className={!isGroup ? "mt-8" : "mt-0"}>
           <div className="flex-between mb-16">
             <h3 className="text-white font-18 bold">인증 사진 <span className="text-gray-600 font-13 font-normal ml-8">{photos.length}/7</span></h3>
           </div>
@@ -1067,11 +1129,12 @@ const MissionInputView = ({ onBack, onSubmit, isGroup, challenge }: { onBack: ()
                   </button>
                 </motion.div>
               ))}
-              {isGroup && photos.length < 7 && (
+              {photos.length < 7 && (
                 <div onClick={() => fileInputRef.current?.click()} className="photo-add-btn">
                   <Camera size={24} className="text-gray-500" />
                 </div>
               )}
+
             </div>
 
             {!isGroup && photos.length === 0 && (
@@ -1088,9 +1151,11 @@ const MissionInputView = ({ onBack, onSubmit, isGroup, challenge }: { onBack: ()
 
 
 
+
         {isGroup && (
-          <div className="animate-fadeIn">
-            <div className="mission-section-label mb-16 text-white font-16 bold">⏱️ 챌린지 기록</div>
+          <div className="animate-fadeIn mt-80 mb-40">
+            <h3 className="text-white font-18 bold mb-24">챌린지 기록</h3>
+
             <div className="record-card">
               {challenge?.recordFields && challenge.recordFields.length > 0 ? (
                 challenge.recordFields.map((field, idx) => (
@@ -1103,11 +1168,19 @@ const MissionInputView = ({ onBack, onSubmit, isGroup, challenge }: { onBack: ()
                           className="record-time-input-small no-spinner"
                           placeholder="00"
                           value={parseMin(records[field.id])}
-                          onChange={(e) => updateTimeRecord(field.id, e.target.value.slice(0, 2), 'min')}
+                          onChange={(e) => {
+                            const val = e.target.value.slice(0, 2);
+                            updateTimeRecord(field.id, val, 'min');
+                            if (val.length === 2) {
+                              // Auto focus next input (seconds)
+                              document.getElementById(`sec-${field.id}`)?.focus();
+                            }
+                          }}
                           onFocus={(e) => e.target.select()}
                         />
                         <span className="record-time-sep">'</span>
                         <input
+                          id={`sec-${field.id}`}
                           type="number"
                           className="record-time-input-small no-spinner"
                           placeholder="00"
@@ -1120,6 +1193,7 @@ const MissionInputView = ({ onBack, onSubmit, isGroup, challenge }: { onBack: ()
                     </div>
                     {idx < (challenge.recordFields?.length || 0) - 1 && <div className="record-divider" />}
                   </React.Fragment>
+
                 ))
               ) : (
                 <div className="record-row">
@@ -1130,11 +1204,18 @@ const MissionInputView = ({ onBack, onSubmit, isGroup, challenge }: { onBack: ()
                       className="record-time-input-small no-spinner"
                       placeholder="00"
                       value={parseMin(records['1KM'])}
-                      onChange={(e) => updateTimeRecord('1KM', e.target.value.slice(0, 2), 'min')}
+                      onChange={(e) => {
+                        const val = e.target.value.slice(0, 2);
+                        updateTimeRecord('1KM', val, 'min');
+                        if (val.length === 2) {
+                          document.getElementById('sec-1KM')?.focus();
+                        }
+                      }}
                       onFocus={(e) => e.target.select()}
                     />
                     <span className="record-time-sep">'</span>
                     <input
+                      id="sec-1KM"
                       type="number"
                       className="record-time-input-small no-spinner"
                       placeholder="00"
@@ -1142,6 +1223,7 @@ const MissionInputView = ({ onBack, onSubmit, isGroup, challenge }: { onBack: ()
                       onChange={(e) => updateTimeRecord('1KM', e.target.value.slice(0, 2), 'sec')}
                       onFocus={(e) => e.target.select()}
                     />
+
                     <span className="record-time-sep">"</span>
                   </div>
                 </div>
@@ -1551,32 +1633,49 @@ const LeaderView = ({
     <div className="admin-content-fade">
       <h4 className="text-gray-700 font-12 bold uppercase tracking-widest mb-16 px-16">미션 승인 대기 ({pendingMissions.length})</h4>
       <div className="flex flex-col gap-12 px-16">
-        {pendingMissions.map(m => (
-          <div key={m.id} className="card admin-approve-card-v2">
-            <div className="flex-between">
-              <div>
-                <div className="flex items-center gap-6 mb-4">
-                  <span className="team-badge-small">TEAM ID: {m.teamId}</span>
-                </div>
-                <h3 className="text-white font-16 bold">{m.type} 인증</h3>
-                <div className="flex items-center gap-12 mt-8">
-                  <div className="record-mini-fit">
-                    <span className="label">1K</span>
-                    <span className="val">{m.records?.k1 || '0-'}</span>
+        {pendingMissions.map(m => {
+          const missionTeam = teams.find(t => t.id === m.teamId);
+          const teamName = missionTeam ? missionTeam.name : '개인';
+
+          return (
+            <div key={m.id} className="card admin-approve-card-v2 overflow-hidden shadow-2xl border-green/20">
+              <div className="flex-between mb-12 px-2">
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-6">
+                    <span className="text-gray-500 font-10 bold uppercase tracking-widest">{m.type}</span>
                   </div>
-                  <div className="record-mini-fit">
-                    <span className="label">5K</span>
-                    <span className="val">{m.records?.k5 || '0-'}</span>
-                  </div>
+                  <h3 className="text-white font-18 bold tracking-tight">[{teamName}] <span className="text-green">{m.userName}</span></h3>
                 </div>
+                <button className="btn-approve-v2 shrink-0 py-8 px-16 bg-green hover:bg-green-light transition-colors" onClick={() => approveMission(m.id)}>
+                  <Check size={18} strokeWidth={3} />
+                  <span className="font-14 bold">승인</span>
+                </button>
               </div>
-              <button className="btn-approve-v2" onClick={() => approveMission(m.id)}>
-                <Check size={18} />
-                <span>승인</span>
-              </button>
+
+              <div className="flex grid-horizontal-records py-18 border-t border-b border-gray-800 bg-white/5 mx--16">
+                {Object.entries(m.records || {}).map(([key, val]) => (
+                  <div key={key} className="record-display-item border-r last:border-r-0 border-gray-800/50">
+                    <span className="text-gray-500 font-11 bold uppercase tracking-widest mb-6">{key}</span>
+                    <span className="text-white font-20 bold tracking-tighter">{String(val) || '00\'00"'}</span>
+                  </div>
+                ))}
+              </div>
+
+
+
+
+              {m.images && m.images.length > 0 && (
+                <div className="mt-16 flex flex-col gap-12">
+                  {m.images.map((img, i) => (
+                    <img key={i} src={img} alt="Mission" className="mission-approve-img-square shadow-lg" />
+                  ))}
+                </div>
+              )}
+
             </div>
-          </div>
-        ))}
+          );
+        })}
+
         {pendingMissions.length === 0 && (
           <div className="empty-state-card py-40">
             <Shield size={32} className="text-gray-800 mb-12" />
@@ -1625,7 +1724,7 @@ const LeaderView = ({
                   <h3 className="text-white text-20 bold truncate mr-12">{t.name}</h3>
                   <div className="relative">
                     <button className="icon-btn-fit-subtle" onClick={() => setShowTeamMenu(showTeamMenu === t.id ? null : t.id)}>
-                      <MoreVertical size={18} className="text-gray-700" />
+                      <MoreVertical size={18} className="text-white" />
                     </button>
 
                     {showTeamMenu === t.id && (
@@ -1797,7 +1896,9 @@ const App: React.FC = () => {
   const [userTeamId, setUserTeamId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'individual' | 'group'>('individual');
   const [isInputView, setIsInputView] = useState(false);
+  const [editingMission, setEditingMission] = useState<Mission | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+
   const [userInfo, setUserInfo] = useState({
     name: '',
     profilePic: null as string | null,
@@ -1805,11 +1906,12 @@ const App: React.FC = () => {
     monthlyDistance: '42.1',
     lastUpdatedMonth: new Date().getMonth() + 1,
     pbs: {
-      k1: "03'45\"",
-      k3: "12'20\"",
-      k5: "21'10\"",
-      k10: "44'30\""
+      '1KM': "03'45\"",
+      '3KM': "12'20\"",
+      '5KM': "21'10\"",
+      '10KM': "44'30\""
     },
+
     monthlyGoal: '100'
   });
 
@@ -1833,7 +1935,8 @@ const App: React.FC = () => {
   const [groupMembers, setGroupMembers] = useState(['김토스', '이러닝', '박스프린트', '최파워', '강속도', '조엔듀런스', '한업힐', '윤리커버리', '런닝맨', '스피드스타', '번개맨', '러너A', '러너B']);
 
   const [challenges, setChallenges] = useState<WeeklyChallenge[]>([
-    { id: 'c1', week: 1, title: '베이스라인 설정', description: '1/3/5km 개인 TT 측정 및 목표 설정', recordFields: [{ id: 'k1', label: '1KM', placeholder: '00:00', unit: '' }, { id: 'k3', label: '3KM', placeholder: '00:00', unit: '' }, { id: 'k5', label: '5KM', placeholder: '00:00', unit: '' }] },
+    { id: 'c1', week: 1, title: '베이스라인 설정', description: '1/3/5km 개인 TT 측정 및 목표 설정', recordFields: [{ id: '1KM', label: '1KM', placeholder: '00:00', unit: '' }, { id: '3KM', label: '3KM', placeholder: '00:00', unit: '' }, { id: '5KM', label: '5KM', placeholder: '00:00', unit: '' }] },
+
     { id: 'c2', week: 2, title: '심폐 & 파워 강화', description: '트레드밀 업힐 인터벌 및 러닝 파워 집중', recordFields: [{ id: 'power', label: '파워', placeholder: '250W', unit: 'W' }, { id: 'hr', label: '심박', placeholder: '165bpm', unit: 'bpm' }] },
     { id: 'c3', week: 3, title: '스피드 개발', description: '스프린트 훈련을 통한 최고속도 향상', recordFields: [{ id: 'sprint', label: '100m', placeholder: '15s', unit: 's' }] },
     { id: 'c4', week: 4, title: '팀 실전 테스트', description: '팀 5km 릴레이 TT 및 실전 점검', recordFields: [{ id: 'relay', label: '5KM', placeholder: '20:00', unit: '' }] },
@@ -1895,7 +1998,20 @@ const App: React.FC = () => {
   const approveMission = (missionId: string) => setMissions(prev => prev.map(m => m.id === missionId ? { ...m, status: 'approved' } : m));
 
   const submitMission = (records: any, photos: string[], distance: string) => {
+    if (editingMission) {
+      setMissions(prev => prev.map(m => m.id === editingMission.id ? {
+        ...m,
+        records,
+        images: photos,
+        distance: parseFloat(distance) || 0
+      } : m));
+      setEditingMission(null);
+      setIsInputView(false);
+      return;
+    }
+
     const isIndividual = viewMode === 'individual';
+
     const targetTeamId = (viewMode === 'group' && userTeamId) ? userTeamId : 'individual';
     const targetGroupId = (viewMode === 'group' && userGroupId) ? userGroupId : 'none';
 
@@ -2075,8 +2191,9 @@ const App: React.FC = () => {
         );
 
       case 'ranking': return <RankingView currentGroupId={isGroupCtx ? userGroupId : null} userInfo={userInfo} />;
-      case 'profile': return <ProfileView team={isGroupCtx ? currentTeam || null : null} missions={missions} userInfo={userInfo} onUpdate={handleUpdateProfile} />;
+      case 'profile': return <ProfileView team={isGroupCtx ? currentTeam || null : null} missions={missions} userInfo={userInfo} onUpdate={handleUpdateProfile} onEditMission={(m) => { setEditingMission(m); setIsInputView(true); }} />;
       case 'leader': return currentGroup ? (
+
         <LeaderView
           group={currentGroup}
           teams={teams}
@@ -2100,7 +2217,7 @@ const App: React.FC = () => {
       {!isInputView && !showOnboarding && userInfo.name && (
         <header className="main-header">
           <h2 className="header-title">10km 릴레이 TT</h2>
-          <button className="group-header-btn" onClick={handleGroupBtnClick}>{viewMode === 'group' ? 'Individual' : 'Group'}</button>
+          <button className="group-header-btn" onClick={handleGroupBtnClick}>{viewMode === 'group' ? 'INDIVIDUAL' : 'GROUP'}</button>
         </header>
       )}
       <AnimatePresence mode="wait">
