@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Home, Trophy, Calendar, Settings, ChevronLeft, Camera, Check, Plus, ArrowRight, Activity, Zap, Share2, UserPlus, Shield, User, Trash, Edit2, X, MoreVertical, Heart, MessageCircle, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createWorker } from 'tesseract.js';
 import './App.css';
 
 type Group = {
@@ -1102,7 +1103,7 @@ const ProfileView = ({
   );
 };
 
-import { createWorker } from 'tesseract.js';
+// tesseract.js import moved to top of file
 
 const DistanceExtractor = ({ onExtract, onImageSelect, distance, setDistance, isGroup }: { onExtract: (dist: string) => void, onImageSelect: (url: string) => void, distance: string, setDistance: (d: string) => void, isGroup: boolean }) => {
   const [loading, setLoading] = useState(false);
@@ -2105,7 +2106,6 @@ const LeaderView = ({
       </div>
 
       {/* Sub-Tabs Navigation */}
-      {/* Sub-Tabs Navigation */}
       <div className="admin-sub-tabs px-16 mb-24">
         <button
           className={`admin-sub-tab-btn ${adminTab === 'approval' ? 'active' : ''}`}
@@ -2175,7 +2175,10 @@ const App: React.FC = () => {
     };
   });
 
-  const [currentPeriod, setCurrentPeriod] = useState(1);
+  const [currentPeriod, setCurrentPeriod] = useState(() => {
+    const saved = localStorage.getItem('currentPeriod');
+    return saved ? parseInt(saved) : 1;
+  });
 
   const [groups, setGroups] = useState<Group[]>(() => {
     const saved = localStorage.getItem('groups');
@@ -2197,6 +2200,20 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const defaultChallenges: WeeklyChallenge[] = [
+    { id: 'c1', week: 1, title: '베이스라인 설정', description: '1/3/5km 개인 TT 측정 및 목표 설정', recordFields: [{ id: '1KM', label: '1KM', placeholder: '00:00', unit: '' }, { id: '3KM', label: '3KM', placeholder: '00:00', unit: '' }, { id: '5KM', label: '5KM', placeholder: '00:00', unit: '' }] },
+    { id: 'c2', week: 2, title: '심폐 & 파워 강화', description: '트레드밀 업힐 인터벌 및 러닝 파워 집중', recordFields: [{ id: 'power', label: '파워', placeholder: '250W', unit: 'W' }, { id: 'hr', label: '심박', placeholder: '165bpm', unit: 'bpm' }] },
+    { id: 'c3', week: 3, title: '스피드 개발', description: '스프린트 훈련을 통한 최고속도 향상', recordFields: [{ id: 'sprint', label: '100m', placeholder: '15s', unit: 's' }] },
+    { id: 'c4', week: 4, title: '팀 실전 테스트', description: '팀 5km 릴레이 TT 및 실전 점검', recordFields: [{ id: 'relay', label: '5KM', placeholder: '20:00', unit: '' }] },
+    { id: 'c5', week: 5, title: '디로드 & 회복', description: '저강도 러닝 및 리커버리 세션', recordFields: [{ id: 'recovery', label: '회복', placeholder: '느낌', unit: '' }] },
+    { id: 'c6', week: 6, title: '레이스 준비', description: '영양 관리 및 최상의 컨디션 조절', recordFields: [] },
+  ];
+
+  const [challenges, setChallenges] = useState<WeeklyChallenge[]>(() => {
+    const saved = localStorage.getItem('challenges');
+    return saved ? JSON.parse(saved) : defaultChallenges;
+  });
+
   // Sync state to localStorage
   useEffect(() => {
     localStorage.setItem('userInfo', JSON.stringify(userInfo));
@@ -2205,6 +2222,8 @@ const App: React.FC = () => {
     localStorage.setItem('teams', JSON.stringify(teams));
     localStorage.setItem('missions', JSON.stringify(missions));
     localStorage.setItem('groupMembers', JSON.stringify(groupMembers));
+    localStorage.setItem('challenges', JSON.stringify(challenges));
+    localStorage.setItem('currentPeriod', String(currentPeriod));
     if (userGroupId) localStorage.setItem('userGroupId', userGroupId);
     else localStorage.removeItem('userGroupId');
     if (userTeamId) localStorage.setItem('userTeamId', userTeamId);
@@ -2212,17 +2231,7 @@ const App: React.FC = () => {
     localStorage.setItem('userRole', userRole);
     localStorage.setItem('viewMode', viewMode);
     localStorage.setItem('myGroupIds', JSON.stringify(myGroupIds));
-  }, [userInfo, allUsers, groups, teams, missions, groupMembers, userGroupId, userTeamId, userRole, viewMode, myGroupIds]);
-
-  const [challenges, setChallenges] = useState<WeeklyChallenge[]>([
-    { id: 'c1', week: 1, title: '베이스라인 설정', description: '1/3/5km 개인 TT 측정 및 목표 설정', recordFields: [{ id: '1KM', label: '1KM', placeholder: '00:00', unit: '' }, { id: '3KM', label: '3KM', placeholder: '00:00', unit: '' }, { id: '5KM', label: '5KM', placeholder: '00:00', unit: '' }] },
-
-    { id: 'c2', week: 2, title: '심폐 & 파워 강화', description: '트레드밀 업힐 인터벌 및 러닝 파워 집중', recordFields: [{ id: 'power', label: '파워', placeholder: '250W', unit: 'W' }, { id: 'hr', label: '심박', placeholder: '165bpm', unit: 'bpm' }] },
-    { id: 'c3', week: 3, title: '스피드 개발', description: '스프린트 훈련을 통한 최고속도 향상', recordFields: [{ id: 'sprint', label: '100m', placeholder: '15s', unit: 's' }] },
-    { id: 'c4', week: 4, title: '팀 실전 테스트', description: '팀 5km 릴레이 TT 및 실전 점검', recordFields: [{ id: 'relay', label: '5KM', placeholder: '20:00', unit: '' }] },
-    { id: 'c5', week: 5, title: '디로드 & 회복', description: '저강도 러닝 및 리커버리 세션', recordFields: [{ id: 'recovery', label: '회복', placeholder: '느낌', unit: '' }] },
-    { id: 'c6', week: 6, title: '레이스 준비', description: '영양 관리 및 최상의 컨디션 조절', recordFields: [] },
-  ]);
+  }, [userInfo, allUsers, groups, teams, missions, groupMembers, userGroupId, userTeamId, userRole, viewMode, myGroupIds, challenges, currentPeriod]);
 
   const addChallenge = () => {
     const nextWeek = challenges.length > 0 ? Math.max(...challenges.map((c: any) => c.week)) + 1 : 1;
@@ -2271,6 +2280,8 @@ const App: React.FC = () => {
       setMyGroupIds(prev => [...prev, group.id]);
       setUserGroupId(group.id);
       setUserRole('user');
+      // 그룹 멤버 목록에 추가
+      setGroupMembers(prev => prev.includes(userInfo.name) ? prev : [...prev, userInfo.name]);
       const groupTeams = teams.filter((t: any) => t.groupId === group.id);
       if (groupTeams.length > 0) {
         const targetTeamId = groupTeams[0].id;
@@ -2481,6 +2492,8 @@ const App: React.FC = () => {
   const deleteGroup = (id: string) => {
     setGroups((prev: any) => prev.filter((g: any) => g.id !== id));
     setTeams((prev: any) => prev.filter((t: any) => t.groupId !== id));
+    setMissions((prev: any) => prev.filter((m: any) => m.groupId !== id));
+    setMyGroupIds(prev => prev.filter(gid => gid !== id));
     setUserGroupId(null);
     setUserTeamId(null);
     setUserRole('user');
@@ -2575,16 +2588,18 @@ const App: React.FC = () => {
           onLogout={() => {
             setUserInfo({
               name: '',
-              statusMessage: '오늘도 즐겁게 달려요! 🏃‍♂️',
+              statusMessage: '러닝 열정 폭발 🔥',
               profilePic: null,
-              monthlyDistance: '42.1',
+              monthlyDistance: '0',
               monthlyGoal: '100',
               lastUpdatedMonth: new Date().getMonth() + 1,
-              pbs: { '1KM': "03'45\"", '3KM': "12'20\"", '5KM': "21'10\"", '10KM': "44'30\"" }
+              pbs: { '1KM': "00'00\"", '3KM': "00'00\"", '5KM': "00'00\"", '10KM': "00'00\"" }
             });
             setUserGroupId(null);
             setUserTeamId(null);
             setUserRole('user');
+            setMyGroupIds([]);
+            setViewMode('individual');
             setActiveTab('home');
             localStorage.clear();
           }}
