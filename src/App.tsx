@@ -139,6 +139,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
   const [confirmPass, setConfirmPass] = useState('');
   const [newGoal, setNewGoal] = useState('100');
   const [signupError, setSignupError] = useState('');
+  const pinInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogin = () => {
     if (!onLogin(loginName, loginPass)) {
@@ -175,21 +176,49 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
 
   const renderPinInput = (value: string, onChange: (v: string) => void) => {
     return (
-      <div className="pin-input-container">
-        {[0, 1, 2, 3, 4, 5].map(i => (
-          <div key={i} className={`pin-box ${value.length === i ? 'active' : ''} ${value.length > i ? 'filled' : ''}`}>
-            {value[i] || '-'}
-          </div>
-        ))}
-        <input
-          type="tel"
-          pattern="[0-9]*"
-          maxLength={6}
-          className="auth-hidden-input"
-          value={value}
-          onChange={e => onChange(e.target.value.replace(/\D/g, ''))}
-          autoFocus
-        />
+      <div className="flex flex-col items-center">
+        <div
+          className="pin-input-container cursor-pointer"
+          onClick={() => pinInputRef.current?.focus()}
+        >
+          {[0, 1, 2, 3, 4, 5].map(i => (
+            <div
+              key={i}
+              className={`pin-box ${value.length === i ? 'active' : ''} ${value.length > i ? 'filled' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (value.length > i) {
+                  onChange(value.substring(0, i));
+                }
+                pinInputRef.current?.focus();
+              }}
+            >
+              {value[i] || '-'}
+            </div>
+          ))}
+          <input
+            ref={pinInputRef}
+            type="tel"
+            pattern="[0-9]*"
+            maxLength={6}
+            className="auth-hidden-input"
+            value={value}
+            onChange={e => onChange(e.target.value.replace(/\D/g, ''))}
+            autoFocus
+          />
+        </div>
+        {value.length > 0 && (
+          <button
+            className="mt-20 text-gray-500 text-13 underline"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange('');
+              pinInputRef.current?.focus();
+            }}
+          >
+            전체 지우고 다시 입력하기
+          </button>
+        )}
       </div>
     );
   };
