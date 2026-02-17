@@ -124,42 +124,190 @@ const OnboardingView = ({ onCreate, onJoin, onBack }: { onCreate: (n: string) =>
   );
 };
 
-const LoginView = ({ onLogin, allMembers }: { onLogin: (name: string) => void, allMembers: string[] }) => {
-  const [nickname, setNickname] = useState('');
-  const [error, setError] = useState('');
+const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string, pass: string) => boolean, onSignup: (data: any) => void, allUserNames: string[] }) => {
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [signupStep, setSignupStep] = useState(1);
+
+  // Login State
+  const [loginName, setLoginName] = useState('');
+  const [loginPass, setLoginPass] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  // Signup State
+  const [newName, setNewName] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
+  const [newGoal, setNewGoal] = useState('100');
+  const [signupError, setSignupError] = useState('');
 
   const handleLogin = () => {
-    if (!nickname.trim()) return;
-    if (allMembers.includes(nickname.trim())) {
-      setError('중복된 닉네임 입니다.');
-      return;
+    if (!onLogin(loginName, loginPass)) {
+      setLoginError('아이디 또는 비밀번호가 일치하지 않습니다.');
     }
-    onLogin(nickname.trim());
   };
 
+  const nextSignupStep = () => {
+    if (signupStep === 1) {
+      if (!newName.trim()) return;
+      if (allUserNames.includes(newName.trim())) {
+        setSignupError('중복된 닉네임 입니다.');
+        return;
+      }
+      setSignupError('');
+    }
+    if (signupStep === 3) {
+      if (newPass !== confirmPass) {
+        setSignupError('비밀번호가 일치하지 않습니다.');
+        return;
+      }
+      setSignupError('');
+    }
+    setSignupStep(prev => prev + 1);
+  };
+
+  const handleSignupComplete = () => {
+    onSignup({
+      name: newName,
+      password: newPass,
+      monthlyGoal: newGoal
+    });
+  };
+
+  const renderSignupStep = () => {
+    switch (signupStep) {
+      case 1: // Nickname
+        return (
+          <div className="auth-container">
+            <div className="auth-header">
+              <h1 className="auth-title">반가워요!<br />닉네임을 알려주세요</h1>
+              <p className="auth-subtitle">챌린지에서 사용할 이름이에요</p>
+            </div>
+            <div className="auth-input-wrapper">
+              <input
+                type="text"
+                className="auth-input"
+                placeholder="닉네임 입력"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                autoFocus
+              />
+            </div>
+            {signupError && <p className="error-msg-premium">{signupError}</p>}
+            <div className="flex-1" />
+            <button className="auth-btn-primary" disabled={!newName.trim()} onClick={nextSignupStep}>다음</button>
+          </div>
+        );
+      case 2: // Password
+        return (
+          <div className="auth-container">
+            <div className="auth-header">
+              <button className="text-gray-500 mb-20" onClick={() => setSignupStep(1)}><ChevronLeft size={24} /></button>
+              <h1 className="auth-title">로그인 시 사용할<br />숫자 6자리를 입력해주세요</h1>
+            </div>
+            <div className="auth-input-wrapper">
+              <input
+                type="password"
+                maxLength={6}
+                className="auth-input text-center tracking-widest font-bold text-24"
+                placeholder="******"
+                value={newPass}
+                onChange={e => setNewPass(e.target.value.replace(/\D/g, ''))}
+                autoFocus
+              />
+            </div>
+            <div className="flex-1" />
+            <button className="auth-btn-primary" disabled={newPass.length < 6} onClick={nextSignupStep}>다음</button>
+          </div>
+        );
+      case 3: // Password Confirm
+        return (
+          <div className="auth-container">
+            <div className="auth-header">
+              <button className="text-gray-500 mb-20" onClick={() => setSignupStep(2)}><ChevronLeft size={24} /></button>
+              <h1 className="auth-title">비밀번호를<br />한 번 더 입력해 주세요</h1>
+            </div>
+            <div className="auth-input-wrapper">
+              <input
+                type="password"
+                maxLength={6}
+                className="auth-input text-center tracking-widest font-bold text-24"
+                placeholder="******"
+                value={confirmPass}
+                onChange={e => setConfirmPass(e.target.value.replace(/\D/g, ''))}
+                autoFocus
+              />
+            </div>
+            {signupError && <p className="error-msg-premium">{signupError}</p>}
+            <div className="flex-1" />
+            <button className="auth-btn-primary" disabled={confirmPass.length < 6} onClick={nextSignupStep}>다음</button>
+          </div>
+        );
+      case 4: // Monthly Goal
+        return (
+          <div className="auth-container">
+            <div className="auth-header">
+              <button className="text-gray-500 mb-20" onClick={() => setSignupStep(3)}><ChevronLeft size={24} /></button>
+              <h1 className="auth-title">이번 달 목표 러닝 마일리지를<br />설정해 주세요</h1>
+              <p className="auth-subtitle">내 속도에 맞는 목표를 정해보세요</p>
+            </div>
+            <div className="auth-input-wrapper">
+              <input
+                type="number"
+                className="auth-input text-24 font-bold"
+                placeholder="100"
+                value={newGoal}
+                onChange={e => setNewGoal(e.target.value)}
+                autoFocus
+              />
+              <span className="text-white font-20 ml-8">km</span>
+            </div>
+            <div className="flex-1" />
+            <button className="auth-btn-primary" onClick={handleSignupComplete}>시작하기</button>
+          </div>
+        );
+      default: return null;
+    }
+  };
+
+  if (mode === 'signup') return renderSignupStep();
+
   return (
-    <div className="page-container flex flex-col justify-center h-full px-24 bg-black">
-      <div className="text-center mb-80">
-        <div className="onboarding-icon-box mx-auto mb-20">
-          <Zap size={36} className="text-green" />
-        </div>
-        <h1 className="text-white text-32 bold tracking-tight">환영합니다!</h1>
-        <h1 className="text-white text-32 bold tracking-tight mt-4">닉네임을 설정해주세요</h1>
+    <div className="auth-container">
+      <div className="flex-center flex-col py-60">
+        <Zap size={48} className="text-green mb-16" />
+        <h1 className="text-white text-32 bold">10km 릴레이 TT</h1>
       </div>
 
-      <div className="onboarding-fields">
-        <input
-          type="text"
-          className="fit-input-lg"
-          placeholder="2~10자 이내로 입력"
-          value={nickname}
-          onChange={e => { setNickname(e.target.value); setError(''); }}
-          autoFocus
-        />
-        {error && <p className="text-red-dim font-12 mt-8 ml-4">{error}</p>}
-        <button className="btn-primary-lg mt-24" onClick={handleLogin}>
-          챌린지 시작하기
-        </button>
+      <div className="auth-input-group">
+        <div className="auth-input-wrapper">
+          <User className="auth-input-icon" size={20} />
+          <input
+            type="text"
+            className="auth-input"
+            placeholder="닉네임"
+            value={loginName}
+            onChange={e => setLoginName(e.target.value)}
+          />
+        </div>
+        <div className="auth-input-wrapper">
+          <Shield className="auth-input-icon" size={20} />
+          <input
+            type="password"
+            maxLength={6}
+            className="auth-input"
+            placeholder="비밀번호 (6자리 숫자)"
+            value={loginPass}
+            onChange={e => setLoginPass(e.target.value.replace(/\D/g, ''))}
+          />
+        </div>
+      </div>
+
+      {loginError && <p className="error-msg-premium">{loginError}</p>}
+
+      <button className="auth-btn-primary" onClick={handleLogin}>로그인</button>
+
+      <div className="text-center">
+        <button className="auth-btn-text" onClick={() => setMode('signup')}>처음이신가요?</button>
       </div>
     </div>
   );
@@ -1773,7 +1921,7 @@ const LeaderView = ({
     <div className="admin-content-fade px-16 pb-60">
       <h4 className="text-gray-700 font-12 bold uppercase tracking-widest mb-16">전체 멤버 ({allMembers.length})</h4>
       <div className="flex flex-col gap-8">
-        {allMembers.map(m => {
+        {allMembers.map((m: any) => {
           const memberTeam = groupTeams.find(t => t.members.includes(m));
           return (
             <div key={m} className="card member-info-card-v2">
@@ -1860,19 +2008,24 @@ const App: React.FC = () => {
   const [editingMission, setEditingMission] = useState<Mission | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
+  const [allUsers, setAllUsers] = useState<any[]>(() => {
+    const saved = localStorage.getItem('allUsers');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [userInfo, setUserInfo] = useState(() => {
     const saved = localStorage.getItem('userInfo');
     return saved ? JSON.parse(saved) : {
       name: '',
       profilePic: null as string | null,
       statusMessage: '러닝 열정 폭발 🔥',
-      monthlyDistance: '42.1',
+      monthlyDistance: '0',
       lastUpdatedMonth: new Date().getMonth() + 1,
       pbs: {
-        '1KM': "03'45\"",
-        '3KM': "12'20\"",
-        '5KM': "21'10\"",
-        '10KM': "44'30\""
+        '1KM': "00'00\"",
+        '3KM': "00'00\"",
+        '5KM': "00'00\"",
+        '10KM': "00'00\""
       },
       monthlyGoal: '100'
     };
@@ -1903,6 +2056,7 @@ const App: React.FC = () => {
   // Sync state to localStorage
   useEffect(() => {
     localStorage.setItem('userInfo', JSON.stringify(userInfo));
+    localStorage.setItem('allUsers', JSON.stringify(allUsers));
     localStorage.setItem('groups', JSON.stringify(groups));
     localStorage.setItem('teams', JSON.stringify(teams));
     localStorage.setItem('missions', JSON.stringify(missions));
@@ -1913,7 +2067,7 @@ const App: React.FC = () => {
     else localStorage.removeItem('userTeamId');
     localStorage.setItem('userRole', userRole);
     localStorage.setItem('viewMode', viewMode);
-  }, [userInfo, groups, teams, missions, groupMembers, userGroupId, userTeamId, userRole, viewMode]);
+  }, [userInfo, allUsers, groups, teams, missions, groupMembers, userGroupId, userTeamId, userRole, viewMode]);
 
   const [challenges, setChallenges] = useState<WeeklyChallenge[]>([
     { id: 'c1', week: 1, title: '베이스라인 설정', description: '1/3/5km 개인 TT 측정 및 목표 설정', recordFields: [{ id: '1KM', label: '1KM', placeholder: '00:00', unit: '' }, { id: '3KM', label: '3KM', placeholder: '00:00', unit: '' }, { id: '5KM', label: '5KM', placeholder: '00:00', unit: '' }] },
@@ -1926,33 +2080,33 @@ const App: React.FC = () => {
   ]);
 
   const addChallenge = () => {
-    const nextWeek = challenges.length > 0 ? Math.max(...challenges.map(c => c.week)) + 1 : 1;
+    const nextWeek = challenges.length > 0 ? Math.max(...challenges.map((c: any) => c.week)) + 1 : 1;
     const newChallenge: WeeklyChallenge = {
       id: `c${Date.now()}`,
       week: nextWeek,
       title: '새로운 훈련',
       description: '훈련 내용을 입력해주세요.'
     };
-    setChallenges(prev => [...prev, newChallenge]);
+    setChallenges((prev: any) => [...prev, newChallenge]);
   };
 
   const updateChallenge = (id: string, title: string, desc: string, fields?: any[]) => {
-    setChallenges(prev => prev.map(c => c.id === id ? { ...c, title, description: desc, recordFields: fields || c.recordFields } : c));
+    setChallenges((prev: any) => prev.map((c: any) => c.id === id ? { ...c, title, description: desc, recordFields: fields || c.recordFields } : c));
   };
 
   const deleteChallenge = (id: string) => {
     if (window.confirm('이 주차의 챌린지를 삭제하시겠습니까?')) {
-      setChallenges(prev => prev.filter(c => c.id !== id));
+      setChallenges((prev: any) => prev.filter((c: any) => c.id !== id));
     }
   };
 
   const handleCreateGroup = (name: string) => {
     const newGroupId = `g${Date.now()}`;
-    setGroups(prev => [...prev, { id: newGroupId, name, leaderId: 'me', inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(), totalScore: 0, totalDistance: 0 }]);
+    setGroups((prev: any) => [...prev, { id: newGroupId, name, leaderId: 'me', inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(), totalScore: 0, totalDistance: 0 }]);
     setUserGroupId(newGroupId);
     setUserRole('leader');
     const newTeamId = `t${Date.now()}`;
-    setTeams(prev => [...prev, { id: newTeamId, groupId: newGroupId, name: `${name} 01팀`, members: [userInfo.name] }]);
+    setTeams((prev: any) => [...prev, { id: newTeamId, groupId: newGroupId, name: `${name} 01팀`, members: [userInfo.name] }]);
     setUserTeamId(newTeamId);
     setShowOnboarding(false);
     setViewMode('group');
@@ -1964,11 +2118,11 @@ const App: React.FC = () => {
     if (group) {
       setUserGroupId(group.id);
       setUserRole('user');
-      const groupTeams = teams.filter(t => t.groupId === group.id);
+      const groupTeams = teams.filter((t: any) => t.groupId === group.id);
       if (groupTeams.length > 0) {
         const targetTeamId = groupTeams[0].id;
         setUserTeamId(targetTeamId);
-        setTeams(prev => prev.map(t => t.id === targetTeamId ? { ...t, members: t.members.includes(userInfo.name) ? t.members : [...t.members, userInfo.name] } : t));
+        setTeams((prev: any) => prev.map((t: any) => t.id === targetTeamId ? { ...t, members: t.members.includes(userInfo.name) ? t.members : [...t.members, userInfo.name] } : t));
       }
       setShowOnboarding(false);
       setViewMode('group');
@@ -1977,14 +2131,14 @@ const App: React.FC = () => {
   };
 
   const handleUpdateProfile = (name: string, status: string, pic: string | null, dist: string, pbs: any, goal?: string) => {
-    setUserInfo(prev => ({ ...prev, name, statusMessage: status, profilePic: pic, monthlyDistance: dist, pbs, monthlyGoal: goal || prev.monthlyGoal }));
+    setUserInfo((prev: any) => ({ ...prev, name, statusMessage: status, profilePic: pic, monthlyDistance: dist, pbs, monthlyGoal: goal || prev.monthlyGoal }));
   };
 
-  const approveMission = (missionId: string) => setMissions(prev => prev.map(m => m.id === missionId ? { ...m, status: 'approved' } : m));
+  const approveMission = (missionId: string) => setMissions((prev: any) => prev.map((m: any) => m.id === missionId ? { ...m, status: 'approved' } : m));
 
   const submitMission = (records: any, photos: string[], distance: string) => {
     if (editingMission) {
-      setMissions(prev => prev.map(m => m.id === editingMission.id ? {
+      setMissions((prev: any) => prev.map((m: any) => m.id === editingMission.id ? {
         ...m,
         records,
         images: photos,
@@ -2005,7 +2159,7 @@ const App: React.FC = () => {
 
     // 1. 개인 마일리지는 개인 화면에서 제출할 때만 OCR 거리만큼 추가됨
     if (isIndividual) {
-      setUserInfo(prev => {
+      setUserInfo((prev: any) => {
         const isNewMonth = prev.lastUpdatedMonth !== currentMonth;
         const baseDist = isNewMonth ? 0 : parseFloat(prev.monthlyDistance);
         return {
@@ -2018,10 +2172,10 @@ const App: React.FC = () => {
 
     // 2. 그룹 활동은 그룹 인증일 때만 추가 (승인 전에도 누적할지 여부는 비즈니스 로직에 따름, 일단 기존 유지)
     if (!isIndividual && userGroupId) {
-      setGroups(prev => prev.map(g => g.id === userGroupId ? { ...g, totalDistance: (g.totalDistance || 0) + addedDist } : g));
+      setGroups((prev: any) => prev.map((g: any) => g.id === userGroupId ? { ...g, totalDistance: (g.totalDistance || 0) + addedDist } : g));
     }
 
-    setMissions(prev => {
+    setMissions((prev: any) => {
       // 주차별로 여러 번 인증이 가능하도록 필터링 로직 제거
       const missionTypeTag = isIndividual ? '개인 러닝' : '챌린지 인증';
 
@@ -2047,13 +2201,13 @@ const App: React.FC = () => {
 
 
   const likeMission = (id: string) => {
-    setMissions(prev => prev.map(m => {
+    setMissions((prev: any) => prev.map((m: any) => {
       if (m.id !== id) return m;
       const isLiked = m.likedBy.includes(userInfo.name);
       return {
         ...m,
         likedBy: isLiked
-          ? m.likedBy.filter(name => name !== userInfo.name)
+          ? m.likedBy.filter((name: string) => name !== userInfo.name)
           : [...m.likedBy, userInfo.name]
       };
     }));
@@ -2066,20 +2220,20 @@ const App: React.FC = () => {
       text,
       timestamp: '방금 전'
     };
-    setMissions(prev => prev.map(m => m.id === missionId ? { ...m, comments: [...m.comments, newComment] } : m));
+    setMissions((prev: any) => prev.map((m: any) => m.id === missionId ? { ...m, comments: [...m.comments, newComment] } : m));
   };
 
   const deleteMission = (id: string) => {
     if (window.confirm('인증 게시물을 삭제하시겠습니까?')) {
-      setMissions(prev => prev.filter(m => m.id !== id));
+      setMissions((prev: any) => prev.filter((m: any) => m.id !== id));
     }
   };
 
   const deleteComment = (missionId: string, commentId: string) => {
     if (window.confirm('댓글을 삭제하시겠습니까?')) {
-      setMissions(prev => prev.map(m =>
+      setMissions((prev: any) => prev.map((m: any) =>
         m.id === missionId
-          ? { ...m, comments: m.comments.filter(c => c.id !== commentId) }
+          ? { ...m, comments: m.comments.filter((c: any) => c.id !== commentId) }
           : m
       ));
     }
@@ -2103,43 +2257,63 @@ const App: React.FC = () => {
   const addTeam = () => {
     if (!userGroupId) return;
     const newTeamId = `t${Date.now()}`;
-    const newTeamCount = teams.filter(t => t.groupId === userGroupId).length + 1;
-    setTeams(prev => [...prev, { id: newTeamId, groupId: userGroupId, name: `새 팀 ${newTeamCount}`, members: [] }]);
+    const newTeamCount = teams.filter((t: any) => t.groupId === userGroupId).length + 1;
+    setTeams((prev: any) => [...prev, { id: newTeamId, groupId: userGroupId, name: `새 팀 ${newTeamCount}`, members: [] }]);
   };
 
   const renameTeam = (teamId: string, newName: string) => {
-    setTeams(prev => prev.map(t => t.id === teamId ? { ...t, name: newName } : t));
+    setTeams((prev: any) => prev.map((t: any) => t.id === teamId ? { ...t, name: newName } : t));
   };
 
   const deleteTeam = (teamId: string) => {
     if (window.confirm('팀을 삭제하시겠습니까?')) {
-      setTeams(prev => prev.filter(t => t.id !== teamId));
+      setTeams((prev: any) => prev.filter((t: any) => t.id !== teamId));
     }
   };
 
   const addMember = (teamId: string, memberName: string) => {
     if (!memberName.trim()) return;
-    setTeams(prev => prev.map(t => t.id === teamId ? { ...t, members: [...t.members, memberName.trim()] } : t));
+    setTeams((prev: any) => prev.map((t: any) => t.id === teamId ? { ...t, members: [...t.members, memberName.trim()] } : t));
   };
 
   const removeMember = (teamId: string, memberName: string) => {
-    setTeams(prev => prev.map(t => t.id === teamId ? { ...t, members: t.members.filter(m => m !== memberName) } : t));
+    setTeams((prev: any) => prev.map((t: any) => t.id === teamId ? { ...t, members: t.members.filter((m: any) => m !== memberName) } : t));
   };
 
   const kickMember = (name: string) => {
     if (window.confirm(`${name} 멤버를 내보내시겠습니까?`)) {
-      setGroupMembers(prev => prev.filter(m => m !== name));
-      setTeams(prev => prev.map(t => ({ ...t, members: t.members.filter(m => m !== name) })));
+      setGroupMembers((prev: any) => prev.filter((m: any) => m !== name));
+      setTeams((prev: any) => prev.map((t: any) => ({ ...t, members: t.members.filter((m: any) => m !== name) })));
     }
   };
 
-  const handleLoginSubmit = (name: string) => {
-    setUserInfo(prev => ({ ...prev, name }));
-    setGroupMembers(prev => prev.includes(name) ? prev : [...prev, name]);
+  const handleLoginSubmit = (name: string, pass: string) => {
+    const user = allUsers.find(u => u.name === name && u.password === pass);
+    if (user) {
+      setUserInfo(user);
+      return true;
+    }
+    return false;
+  };
+
+  const handleSignupSubmit = (data: any) => {
+    const newUser = {
+      name: data.name,
+      password: data.password,
+      profilePic: null,
+      statusMessage: '러닝 열정 폭발 🔥',
+      monthlyDistance: '0',
+      lastUpdatedMonth: new Date().getMonth() + 1,
+      pbs: { '1KM': "00'00\"", '3KM': "00'00\"", '5KM': "00'00\"", '10KM': "00'00\"" },
+      monthlyGoal: data.monthlyGoal
+    };
+    setAllUsers((prev: any[]) => [...prev, newUser]);
+    setGroupMembers((prev: string[]) => [...prev, newUser.name]);
+    setUserInfo(newUser);
   };
 
   const renderContent = () => {
-    if (!userInfo.name) return <LoginView onLogin={handleLoginSubmit} allMembers={groupMembers} />;
+    if (!userInfo.name) return <AuthView onLogin={handleLoginSubmit} onSignup={handleSignupSubmit} allUserNames={allUsers.map(u => u.name)} />;
     if (showOnboarding) return <OnboardingView onCreate={handleCreateGroup} onJoin={handleJoinGroup} onBack={() => setShowOnboarding(false)} />;
     if (isInputView) return <MissionInputView onBack={() => setIsInputView(false)} onSubmit={submitMission} isGroup={viewMode === 'group'} challenge={challenges.find(c => c.week === currentPeriod)} />;
 
@@ -2160,8 +2334,8 @@ const App: React.FC = () => {
         );
       case 'community':
         const filteredMissions = viewWeek
-          ? missions.filter(m => m.week === viewWeek && m.status === 'approved')
-          : missions.filter(m => m.status === 'approved');
+          ? missions.filter((m: any) => m.week === viewWeek && m.status === 'approved')
+          : missions.filter((m: any) => m.status === 'approved');
         return (
           <WeeklyFeedView
             week={viewWeek}
