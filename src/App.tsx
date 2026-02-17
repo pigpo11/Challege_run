@@ -199,7 +199,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
       case 1: // Nickname
         return (
           <div className="auth-container relative">
-            <button className="absolute top-40 left-24 text-white p-4" onClick={() => setMode('login')}><ChevronLeft size={28} /></button>
+            <button className="auth-back-btn" onClick={() => setMode('login')}><ChevronLeft size={28} /></button>
             <div className="auth-header">
               <h1 className="auth-title">반가워요!<br />닉네임을 알려주세요</h1>
               <p className="auth-subtitle">챌린지에서 사용할 이름이에요</p>
@@ -221,7 +221,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
       case 2: // Password
         return (
           <div className="auth-container relative">
-            <button className="absolute top-40 left-24 text-white p-4" onClick={() => setSignupStep(1)}><ChevronLeft size={28} /></button>
+            <button className="auth-back-btn" onClick={() => setSignupStep(1)}><ChevronLeft size={28} /></button>
             <div className="auth-header">
               <h1 className="auth-title">로그인 시 사용할<br />숫자 6자리를 입력해주세요</h1>
             </div>
@@ -232,7 +232,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
       case 3: // Password Confirm
         return (
           <div className="auth-container relative">
-            <button className="absolute top-40 left-24 text-white p-4" onClick={() => setSignupStep(2)}><ChevronLeft size={28} /></button>
+            <button className="auth-back-btn" onClick={() => setSignupStep(2)}><ChevronLeft size={28} /></button>
             <div className="auth-header">
               <h1 className="auth-title">비밀번호를<br />한 번 더 입력해 주세요</h1>
             </div>
@@ -244,7 +244,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
       case 4: // Monthly Goal
         return (
           <div className="auth-container relative">
-            <button className="absolute top-40 left-24 text-white p-4" onClick={() => setSignupStep(3)}><ChevronLeft size={28} /></button>
+            <button className="auth-back-btn" onClick={() => setSignupStep(3)}><ChevronLeft size={28} /></button>
             <div className="auth-header">
               <h1 className="auth-title">이번 달 목표 러닝 마일리지를<br />설정해 주세요</h1>
               <p className="auth-subtitle">내 속도에 맞는 목표를 정해보세요</p>

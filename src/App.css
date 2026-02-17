@@ -2930,3 +2930,18 @@
   z-index: 10;
   cursor: default;
 }
+
+.auth-back-btn {
+  position: absolute;
+  top: 40px;
+  left: 24px;
+  background: transparent !important;
+  border: none !important;
+  color: #fff !important;
+  padding: 8px !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
