@@ -207,18 +207,6 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
             autoFocus
           />
         </div>
-        {value.length > 0 && (
-          <button
-            className="mt-20 text-gray-500 text-13 underline"
-            onClick={(e) => {
-              e.stopPropagation();
-              onChange('');
-              pinInputRef.current?.focus();
-            }}
-          >
-            전체 지우고 다시 입력하기
-          </button>
-        )}
       </div>
     );
   };
