@@ -1090,7 +1090,7 @@ const ProfileView = ({
             </button>
           )}
 
-          <button className="btn-logout-premium" onClick={() => {
+          <button className="btn-dark-lg py-16 text-red-dim" onClick={() => {
             if (window.confirm('로그아웃 하시겠습니까?')) {
               onLogout();
             }
