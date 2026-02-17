@@ -192,6 +192,16 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
   const [newGoal, setNewGoal] = useState('100');
   const [signupError, setSignupError] = useState('');
   const pinInputRef = useRef<HTMLInputElement>(null);
+  const confirmPinInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus PIN input when step changes
+  useEffect(() => {
+    if (signupStep === 2) {
+      setTimeout(() => pinInputRef.current?.focus(), 100);
+    } else if (signupStep === 3) {
+      setTimeout(() => confirmPinInputRef.current?.focus(), 100);
+    }
+  }, [signupStep]);
 
   const handleLogin = async () => {
     const result = await onLogin(loginName, loginPass);
@@ -227,12 +237,12 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
     });
   };
 
-  const renderPinInput = (value: string, onChange: (v: string) => void) => {
+  const renderPinInput = (value: string, onChange: (v: string) => void, ref: React.RefObject<HTMLInputElement | null>) => {
     return (
       <div className="flex flex-col items-center">
         <div
           className="pin-input-container cursor-pointer"
-          onClick={() => pinInputRef.current?.focus()}
+          onClick={() => ref.current?.focus()}
         >
           {[0, 1, 2, 3, 4, 5].map(i => (
             <div
@@ -243,14 +253,14 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
                 if (value.length > i) {
                   onChange(value.substring(0, i));
                 }
-                pinInputRef.current?.focus();
+                ref.current?.focus();
               }}
             >
               {value[i] || '-'}
             </div>
           ))}
           <input
-            ref={pinInputRef}
+            ref={ref}
             type="tel"
             pattern="[0-9]*"
             maxLength={6}
@@ -291,22 +301,22 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
       case 2: // Password
         return (
           <div className="auth-container relative">
-            <button className="auth-back-btn" onClick={() => setSignupStep(1)}><ChevronLeft size={28} /></button>
+            <button className="auth-back-btn" onClick={() => { setNewPass(''); setSignupError(''); setSignupStep(1); }}><ChevronLeft size={28} /></button>
             <div className="auth-header">
               <h1 className="auth-title">로그인 시 사용할<br />숫자 6자리를 입력해주세요</h1>
             </div>
-            {renderPinInput(newPass, setNewPass)}
+            {renderPinInput(newPass, setNewPass, pinInputRef)}
             <button className="auth-btn-primary" disabled={newPass.length < 6} onClick={nextSignupStep}>다음</button>
           </div>
         );
       case 3: // Password Confirm
         return (
           <div className="auth-container relative">
-            <button className="auth-back-btn" onClick={() => setSignupStep(2)}><ChevronLeft size={28} /></button>
+            <button className="auth-back-btn" onClick={() => { setConfirmPass(''); setSignupError(''); setSignupStep(2); }}><ChevronLeft size={28} /></button>
             <div className="auth-header">
               <h1 className="auth-title">비밀번호를<br />한 번 더 입력해 주세요</h1>
             </div>
-            {renderPinInput(confirmPass, setConfirmPass)}
+            {renderPinInput(confirmPass, setConfirmPass, confirmPinInputRef)}
             {signupError && <p className="error-msg-premium text-center">{signupError}</p>}
             <button className="auth-btn-primary" disabled={confirmPass.length < 6} onClick={nextSignupStep}>다음</button>
           </div>
@@ -314,7 +324,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
       case 4: // Monthly Goal
         return (
           <div className="auth-container relative">
-            <button className="auth-back-btn" onClick={() => setSignupStep(3)}><ChevronLeft size={28} /></button>
+            <button className="auth-back-btn" onClick={() => { setNewGoal('100'); setSignupStep(3); }}><ChevronLeft size={28} /></button>
             <div className="auth-header">
               <h1 className="auth-title">이번 달 목표 러닝 마일리지를<br />설정해 주세요</h1>
               <p className="auth-subtitle">내 속도에 맞는 목표를 정해보세요</p>
