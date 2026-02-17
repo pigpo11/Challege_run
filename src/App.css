@@ -2762,30 +2762,6 @@
   margin-left: 2px;
 }
 
-/* Logout Button Style */
-.btn-logout-premium {
-  width: 100%;
-  background: #1c1c1e;
-  color: #ff3b30;
-  border: none;
-  padding: 18px;
-  border-radius: 16px;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin-top: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.btn-logout-premium:active {
-  transform: scale(0.98);
-  background: #2c2c2e;
-}
-
 /* Auth & Onboarding Styling */
 .auth-container {
   padding: 40px 24px;
@@ -2913,6 +2889,7 @@
   margin-top: 16px;
   padding-left: 4px;
 }
+
 .auth-hidden-input {
   position: absolute;
   top: 0;
@@ -2952,8 +2929,10 @@ input::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
 input[type=number] {
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 /* Admin Settings Menu */
@@ -2965,7 +2944,7 @@ input[type=number] {
   background: #1c1c1e;
   border: 1px solid #2c2c2e;
   border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   z-index: 100;
   overflow: hidden;
   display: flex;
@@ -3022,16 +3001,4 @@ button {
   padding: 0;
   cursor: pointer;
   font-family: inherit;
-}
-
-.btn-delete-subtle {
-  background: transparent;
-  color: #ff453a;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-  padding: 4px;
-}
-
-.btn-delete-subtle:hover {
-  opacity: 1;
 }
