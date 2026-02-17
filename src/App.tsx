@@ -118,7 +118,7 @@ const OnboardingView = ({ onCreate, onJoin, onBack, allGroupNames }: { onCreate:
               <input
                 type="text"
                 className="fit-input-lg"
-                placeholder="6자리 초대코드 (예: RUN-123)"
+                placeholder="6자리 초대코드"
                 value={value}
                 onChange={e => setValue(e.target.value)}
                 autoFocus
@@ -2197,6 +2197,7 @@ const App: React.FC = () => {
   const [showGroupSelector, setShowGroupSelector] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Profile state - includes supabase profile ID
   const [profileId, setProfileId] = useState<string | null>(() => localStorage.getItem('profileId'));
@@ -2665,17 +2666,45 @@ const App: React.FC = () => {
     setUserTeamId(myTeam ? myTeam.id : null);
   };
 
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
   const leaveGroup = async (groupId: string) => {
     if (!profileId) return;
-    try {
-      await db.leaveGroup(groupId, profileId);
-    } catch (e) {
-      console.error('Failed to leave group:', e);
+
+    // Check if the current user is the leader of this group
+    const group = groups.find(g => g.id === groupId);
+    const isLeader = group && group.leaderId === profileId;
+
+    if (isLeader) {
+      if (!confirm('그룹장이 탈퇴하면 그룹이 삭제됩니다. 정말 탈퇴하시겠습니까?')) return;
+      try {
+        await db.deleteGroup(groupId);
+        showToast(`'${group.name}' 그룹이 삭제되었습니다.`);
+      } catch (e) {
+        console.error('Failed to delete group:', e);
+        showToast('그룹 삭제 중 오류가 발생했습니다.');
+        return;
+      }
+    } else {
+      if (!confirm('정말 이 그룹을 탈퇴하시겠습니까?')) return;
+      try {
+        await db.leaveGroup(groupId, profileId);
+        showToast('그룹에서 탈퇴했습니다.');
+      } catch (e) {
+        console.error('Failed to leave group:', e);
+        showToast('그룹 탈퇴 중 오류가 발생했습니다.');
+        return;
+      }
     }
 
     const updatedIds = myGroupIds.filter(id => id !== groupId);
     setMyGroupIds(updatedIds);
-    setGroups(prev => prev.filter(g => g.id !== groupId || updatedIds.includes(g.id)));
+    setGroups(prev => prev.filter(g => g.id !== groupId));
+    setTeams(prev => prev.filter((t: any) => t.groupId !== groupId));
+    setMissions(prev => prev.filter((m: any) => m.groupId !== groupId));
 
     if (userGroupId === groupId) {
       if (updatedIds.length > 0) {
@@ -2998,6 +3027,21 @@ const App: React.FC = () => {
           {userRole === 'leader' && viewMode === 'group' && <div className={`nav-item ${activeTab === 'leader' ? 'active' : ''}`} onClick={() => setActiveTab('leader')}><Shield size={22} /><span>그룹 관리</span></div>}
         </nav>
       )}
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            className="toast-notification"
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            transition={{ duration: 0.3 }}
+          >
+            {toastMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
