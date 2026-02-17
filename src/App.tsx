@@ -1085,7 +1085,7 @@ const ProfileView = ({
                 onLeaveGroup();
               }
             }}>
-              <Trash size={18} /> 그룹 탈퇴하기
+              그룹 탈퇴하기
             </button>
           )}
 
@@ -1094,7 +1094,7 @@ const ProfileView = ({
               onLogout();
             }
           }}>
-            <X size={18} /> 로그아웃
+            로그아웃
           </button>
         </div>
       </div>
