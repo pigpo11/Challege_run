@@ -2878,11 +2878,12 @@
 
 .pin-input-container {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 8px;
   margin-top: 40px;
 }
 
-.pin-dot {
+.pin-box {
   width: 48px;
   height: 56px;
   background: #1c1c1e;
@@ -2893,15 +2894,21 @@
   font-size: 24px;
   color: #fff;
   font-weight: 700;
+  border: 2px solid transparent;
+  transition: all 0.2s;
 }
 
-.pin-dot.active {
-  border: 2px solid #3a82f6;
+.pin-box.active {
+  border-color: var(--fit-green);
+}
+
+.pin-box.filled {
+  color: var(--fit-green);
 }
 
 .error-msg-premium {
   color: #ff453a;
   font-size: 13px;
-  margin-top: 8px;
+  margin-top: 16px;
   padding-left: 4px;
 }

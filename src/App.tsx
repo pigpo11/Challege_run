@@ -173,6 +173,27 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
     });
   };
 
+  const renderPinInput = (value: string, onChange: (v: string) => void) => {
+    return (
+      <div className="pin-input-container">
+        {[0, 1, 2, 3, 4, 5].map(i => (
+          <div key={i} className={`pin-box ${value.length === i ? 'active' : ''} ${value.length > i ? 'filled' : ''}`}>
+            {value[i] || '-'}
+          </div>
+        ))}
+        <input
+          type="tel"
+          pattern="[0-9]*"
+          maxLength={6}
+          className="absolute inset-0 opacity-0 cursor-default"
+          value={value}
+          onChange={e => onChange(e.target.value.replace(/\D/g, ''))}
+          autoFocus
+        />
+      </div>
+    );
+  };
+
   const renderSignupStep = () => {
     switch (signupStep) {
       case 1: // Nickname
@@ -185,7 +206,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
             <div className="auth-input-wrapper">
               <input
                 type="text"
-                className="auth-input"
+                className="auth-input text-center"
                 placeholder="닉네임 입력"
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
@@ -200,20 +221,10 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
         return (
           <div className="auth-container">
             <div className="auth-header">
-              <button className="text-gray-500 mb-20 block mx-auto" onClick={() => setSignupStep(1)}><ChevronLeft size={24} /></button>
+              <button className="text-gray-500 mb-20 block mx-auto bg-gray-800 p-8 rounded-lg" onClick={() => setSignupStep(1)}><ChevronLeft size={20} /></button>
               <h1 className="auth-title">로그인 시 사용할<br />숫자 6자리를 입력해주세요</h1>
             </div>
-            <div className="auth-input-wrapper">
-              <input
-                type="password"
-                maxLength={6}
-                className="auth-input text-center tracking-widest font-bold text-24"
-                placeholder="******"
-                value={newPass}
-                onChange={e => setNewPass(e.target.value.replace(/\D/g, ''))}
-                autoFocus
-              />
-            </div>
+            {renderPinInput(newPass, setNewPass)}
             <button className="auth-btn-primary" disabled={newPass.length < 6} onClick={nextSignupStep}>다음</button>
           </div>
         );
@@ -221,20 +232,10 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
         return (
           <div className="auth-container">
             <div className="auth-header">
-              <button className="text-gray-500 mb-20 block mx-auto" onClick={() => setSignupStep(2)}><ChevronLeft size={24} /></button>
+              <button className="text-gray-500 mb-20 block mx-auto bg-gray-800 p-8 rounded-lg" onClick={() => setSignupStep(2)}><ChevronLeft size={20} /></button>
               <h1 className="auth-title">비밀번호를<br />한 번 더 입력해 주세요</h1>
             </div>
-            <div className="auth-input-wrapper">
-              <input
-                type="password"
-                maxLength={6}
-                className="auth-input text-center tracking-widest font-bold text-24"
-                placeholder="******"
-                value={confirmPass}
-                onChange={e => setConfirmPass(e.target.value.replace(/\D/g, ''))}
-                autoFocus
-              />
-            </div>
+            {renderPinInput(confirmPass, setConfirmPass)}
             {signupError && <p className="error-msg-premium text-center">{signupError}</p>}
             <button className="auth-btn-primary" disabled={confirmPass.length < 6} onClick={nextSignupStep}>다음</button>
           </div>
@@ -243,14 +244,14 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
         return (
           <div className="auth-container">
             <div className="auth-header">
-              <button className="text-gray-500 mb-20 block mx-auto" onClick={() => setSignupStep(3)}><ChevronLeft size={24} /></button>
+              <button className="text-gray-500 mb-20 block mx-auto bg-gray-800 p-8 rounded-lg" onClick={() => setSignupStep(3)}><ChevronLeft size={20} /></button>
               <h1 className="auth-title">이번 달 목표 러닝 마일리지를<br />설정해 주세요</h1>
               <p className="auth-subtitle">내 속도에 맞는 목표를 정해보세요</p>
             </div>
             <div className="auth-input-wrapper">
               <input
                 type="number"
-                className="auth-input text-24 font-bold"
+                className="auth-input text-24 font-bold text-center"
                 placeholder="100"
                 value={newGoal}
                 onChange={e => setNewGoal(e.target.value)}
@@ -270,8 +271,8 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
   return (
     <div className="auth-container">
       <div className="flex-center flex-col mb-48">
-        <Zap size={48} fill="#3a82f6" color="#3a82f6" className="mb-16" />
-        <h1 className="text-white text-32 bold">Challenge Epi</h1>
+        <Zap size={64} fill="#3a82f6" color="#3a82f6" strokeWidth={0} className="mb-20" />
+        <h1 className="text-white text-36 bold italic tracking-tight">TT Challenge</h1>
       </div>
 
       <div className="auth-input-group">
