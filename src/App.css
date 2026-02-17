@@ -2955,3 +2955,44 @@ input::-webkit-inner-spin-button {
 input[type=number] {
   -moz-appearance: textfield;
 }
+
+/* Admin Settings Menu */
+.admin-menu-dropdown {
+  position: absolute;
+  right: 0;
+  top: 48px;
+  width: 160px;
+  background: #1c1c1e;
+  border: 1px solid #2c2c2e;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  z-index: 100;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-menu-item {
+  width: 100%;
+  text-align: left;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.admin-menu-item:hover {
+  background: #2c2c2e;
+}
+
+.admin-menu-item.danger {
+  color: #ff453a;
+  border-top: 1px solid #2c2c2e;
+}

@@ -1717,7 +1717,8 @@ const LeaderView = ({
   addMember,
   removeMember,
   kickMember,
-  allMembers
+  allMembers,
+  onDeleteGroup
 }: {
   group: Group,
   teams: Team[],
@@ -2004,10 +2005,10 @@ const LeaderView = ({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 10 }}
-                className="absolute right-0 top-48 w-160 bg-gray-900 border border-gray-800 rounded-12 shadow-2xl z-20 overflow-hidden"
+                className="admin-menu-dropdown"
               >
                 <button
-                  className="w-full text-left px-16 py-12 text-white font-14 flex items-center gap-10 hover:bg-gray-800"
+                  className="admin-menu-item"
                   onClick={() => {
                     navigator.clipboard.writeText(group.inviteCode);
                     alert(`초대코드(${group.inviteCode})가 복사되었습니다.`);
@@ -2017,7 +2018,7 @@ const LeaderView = ({
                   <Share2 size={16} className="text-green" /> 초대코드 복사
                 </button>
                 <button
-                  className="w-full text-left px-16 py-12 text-red font-14 flex items-center gap-10 hover:bg-gray-800 border-t border-gray-800"
+                  className="admin-menu-item danger"
                   onClick={() => {
                     if (window.confirm('정말로 이 그룹을 삭제하시겠습니까? 관련 데이터가 모두 삭제됩니다.')) {
                       onDeleteGroup(group.id);
