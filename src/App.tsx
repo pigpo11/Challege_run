@@ -132,6 +132,61 @@ const OnboardingView = ({ onCreate, onJoin, onBack, allGroupNames }: { onCreate:
     </div>
   );
 };
+const GroupSelectorView = ({
+  myGroups,
+  onSelect,
+  onLeave,
+  onAddNew,
+  onBack
+}: {
+  myGroups: Group[],
+  onSelect: (id: string) => void,
+  onLeave: (id: string) => void,
+  onAddNew: () => void,
+  onBack: () => void
+}) => {
+  return (
+    <div className="page-container flex flex-col justify-center h-full px-24 bg-black">
+      <div className="text-center mb-40">
+        <h1 className="text-white text-32 bold tracking-tighter">그룹 전환</h1>
+        <p className="text-gray mt-12 font-15">참여 중인 그룹을 선택하거나<br />새로운 그룹에 도전해보세요</p>
+      </div>
+
+      <div className="flex flex-col gap-12 max-h-360 overflow-y-auto scroll-hide pr-2">
+        {myGroups.map(g => (
+          <div key={g.id} className="group-select-card" onClick={() => onSelect(g.id)}>
+            <div className="flex-1">
+              <h3 className="text-white text-18 bold">{g.name}</h3>
+              <p className="text-green font-12 mt-4 bold uppercase tracking-wider">전환하기</p>
+            </div>
+            <button
+              className="p-8 text-gray-700 hover:text-red transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm(`${g.name} 그룹에서 탈퇴하시겠습니까?`)) {
+                  onLeave(g.id);
+                }
+              }}
+            >
+              <Trash2 size={20} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-12 mt-32">
+        <button className="btn-primary-lg py-20" onClick={onAddNew}>
+          <Plus size={20} /> 새로운 그룹 참가하기
+        </button>
+
+        <button className="btn-dark-lg py-20" onClick={onBack}>
+          뒤로가기
+        </button>
+      </div>
+    </div>
+  );
+};
+
 
 const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string, pass: string) => boolean, onSignup: (data: any) => void, allUserNames: string[] }) => {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -2074,6 +2129,13 @@ const App: React.FC = () => {
   const [isInputView, setIsInputView] = useState(false);
   const [editingMission, setEditingMission] = useState<Mission | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showGroupSelector, setShowGroupSelector] = useState(false);
+  const [myGroupIds, setMyGroupIds] = useState<string[]>(() => {
+    const saved = localStorage.getItem('myGroupIds');
+    if (saved) return JSON.parse(saved);
+    const oldId = localStorage.getItem('userGroupId');
+    return oldId ? [oldId] : [];
+  });
 
   const [allUsers, setAllUsers] = useState<any[]>(() => {
     const saved = localStorage.getItem('allUsers');
@@ -2134,7 +2196,8 @@ const App: React.FC = () => {
     else localStorage.removeItem('userTeamId');
     localStorage.setItem('userRole', userRole);
     localStorage.setItem('viewMode', viewMode);
-  }, [userInfo, allUsers, groups, teams, missions, groupMembers, userGroupId, userTeamId, userRole, viewMode]);
+    localStorage.setItem('myGroupIds', JSON.stringify(myGroupIds));
+  }, [userInfo, allUsers, groups, teams, missions, groupMembers, userGroupId, userTeamId, userRole, viewMode, myGroupIds]);
 
   const [challenges, setChallenges] = useState<WeeklyChallenge[]>([
     { id: 'c1', week: 1, title: '베이스라인 설정', description: '1/3/5km 개인 TT 측정 및 목표 설정', recordFields: [{ id: '1KM', label: '1KM', placeholder: '00:00', unit: '' }, { id: '3KM', label: '3KM', placeholder: '00:00', unit: '' }, { id: '5KM', label: '5KM', placeholder: '00:00', unit: '' }] },
@@ -2169,13 +2232,16 @@ const App: React.FC = () => {
 
   const handleCreateGroup = (name: string) => {
     const newGroupId = `g${Date.now()}`;
-    setGroups((prev: any) => [...prev, { id: newGroupId, name, leaderId: 'me', inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(), totalScore: 0, totalDistance: 0 }]);
+    const newInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    setGroups((prev: any) => [...prev, { id: newGroupId, name, leaderId: 'me', inviteCode: newInviteCode, totalScore: 0, totalDistance: 0 }]);
+    setMyGroupIds(prev => [...prev, newGroupId]);
     setUserGroupId(newGroupId);
     setUserRole('leader');
     const newTeamId = `t${Date.now()}`;
     setTeams((prev: any) => [...prev, { id: newTeamId, groupId: newGroupId, name: `${name} 01팀`, members: [userInfo.name] }]);
     setUserTeamId(newTeamId);
     setShowOnboarding(false);
+    setShowGroupSelector(false);
     setViewMode('group');
     setActiveTab('leader');
   };
@@ -2183,6 +2249,11 @@ const App: React.FC = () => {
   const handleJoinGroup = (code: string) => {
     const group = groups.find(g => g.inviteCode === code);
     if (group) {
+      if (myGroupIds.includes(group.id)) {
+        alert('이미 참여 중인 그룹입니다.');
+        return;
+      }
+      setMyGroupIds(prev => [...prev, group.id]);
       setUserGroupId(group.id);
       setUserRole('user');
       const groupTeams = teams.filter((t: any) => t.groupId === group.id);
@@ -2192,6 +2263,7 @@ const App: React.FC = () => {
         setTeams((prev: any) => prev.map((t: any) => t.id === targetTeamId ? { ...t, members: t.members.includes(userInfo.name) ? t.members : [...t.members, userInfo.name] } : t));
       }
       setShowOnboarding(false);
+      setShowGroupSelector(false);
       setViewMode('group');
       setActiveTab('home');
     } else alert('유효하지 않은 초대코드입니다.');
@@ -2310,14 +2382,51 @@ const App: React.FC = () => {
   const currentGroup = groups.find(g => g.id === userGroupId);
   const currentTeam = teams.find(t => t.id === userTeamId);
 
+  const switchGroup = (groupId: string) => {
+    setUserGroupId(groupId);
+    const group = groups.find(g => g.id === groupId);
+    if (group) {
+      setUserRole(group.leaderId === 'me' ? 'leader' : 'user');
+      const myTeam = teams.find(t => t.groupId === groupId && t.members.includes(userInfo.name));
+      setUserTeamId(myTeam ? myTeam.id : null);
+    }
+    setShowGroupSelector(false);
+    setViewMode('group');
+    setActiveTab('home');
+  };
+
+  const leaveGroup = (groupId: string) => {
+    const updatedIds = myGroupIds.filter(id => id !== groupId);
+    setMyGroupIds(updatedIds);
+    setTeams(prev => prev.map(t => t.groupId === groupId ? { ...t, members: t.members.filter(m => m !== userInfo.name) } : t));
+
+    if (userGroupId === groupId) {
+      if (updatedIds.length > 0) {
+        switchGroup(updatedIds[0]);
+      } else {
+        setUserGroupId(null);
+        setUserTeamId(null);
+        setUserRole('user');
+        setViewMode('individual');
+        setActiveTab('home');
+      }
+    }
+    if (updatedIds.length === 0) {
+      setShowGroupSelector(false);
+      setShowOnboarding(false);
+    }
+  };
+
   const handleGroupBtnClick = () => {
-    if (!userGroupId) setShowOnboarding(true);
-    else if (viewMode === 'group') {
+    if (viewMode === 'group') {
       setViewMode('individual');
       setActiveTab('home');
     } else {
-      setViewMode('group');
-      setActiveTab('home');
+      if (myGroupIds.length === 0) {
+        setShowOnboarding(true);
+      } else {
+        setShowGroupSelector(true);
+      }
     }
   };
 
@@ -2391,7 +2500,19 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     if (!userInfo.name) return <AuthView onLogin={handleLoginSubmit} onSignup={handleSignupSubmit} allUserNames={allUsers.map(u => u.name)} />;
-    if (showOnboarding) return <OnboardingView onCreate={handleCreateGroup} onJoin={handleJoinGroup} onBack={() => setShowOnboarding(false)} allGroupNames={groups.map(g => g.name)} />;
+
+    if (showOnboarding) return <OnboardingView onCreate={handleCreateGroup} onJoin={handleJoinGroup} onBack={() => { setShowOnboarding(false); if (myGroupIds.length > 0) setShowGroupSelector(true); }} allGroupNames={groups.map(g => g.name)} />;
+
+    if (showGroupSelector) return (
+      <GroupSelectorView
+        myGroups={groups.filter(g => myGroupIds.includes(g.id))}
+        onSelect={switchGroup}
+        onLeave={leaveGroup}
+        onAddNew={() => { setShowGroupSelector(false); setShowOnboarding(true); }}
+        onBack={() => setShowGroupSelector(false)}
+      />
+    );
+
     if (isInputView) return <MissionInputView onBack={() => setIsInputView(false)} onSubmit={submitMission} isGroup={viewMode === 'group'} challenge={challenges.find(c => c.week === currentPeriod)} />;
 
     const isGroupCtx = viewMode === 'group' && userGroupId;
@@ -2483,7 +2604,7 @@ const App: React.FC = () => {
         </header>
       )}
       <AnimatePresence mode="wait">
-        <motion.div key={isInputView ? 'input' : showOnboarding ? 'onboarding' : (activeTab + (viewWeek ? `-week-${viewWeek}` : ''))} initial={{ opacity: 0, x: isInputView ? 50 : 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: isInputView ? -50 : -20 }} transition={{ duration: 0.3 }} className="content-area">
+        <motion.div key={isInputView ? 'input' : showOnboarding ? 'onboarding' : showGroupSelector ? 'selector' : (activeTab + (viewWeek ? `-week-${viewWeek}` : ''))} initial={{ opacity: 0, x: isInputView ? 50 : 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: isInputView ? -50 : -20 }} transition={{ duration: 0.3 }} className="content-area">
           {renderContent()}
         </motion.div>
       </AnimatePresence>

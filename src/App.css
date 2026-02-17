@@ -2996,3 +2996,21 @@ input[type=number] {
   color: #ff453a;
   border-top: 1px solid #2c2c2e;
 }
+
+/* Group Selector Styles */
+.group-select-card {
+  background: var(--fit-gray-800);
+  border-radius: 16px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid var(--fit-dark-100);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.group-select-card:active {
+  transform: scale(0.98);
+  background: #2c2c2e;
+}
