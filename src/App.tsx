@@ -185,7 +185,8 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
           type="tel"
           pattern="[0-9]*"
           maxLength={6}
-          className="absolute inset-0 opacity-0 cursor-default"
+          className="absolute inset-0 opacity-0 bg-transparent border-none outline-none caret-transparent text-transparent w-full h-full cursor-default"
+          style={{ appearance: 'none', WebkitAppearance: 'none' }}
           value={value}
           onChange={e => onChange(e.target.value.replace(/\D/g, ''))}
           autoFocus
@@ -219,9 +220,9 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
         );
       case 2: // Password
         return (
-          <div className="auth-container">
+          <div className="auth-container relative">
+            <button className="absolute top-40 left-24 text-gray-500" onClick={() => setSignupStep(1)}><ChevronLeft size={24} /></button>
             <div className="auth-header">
-              <button className="text-gray-500 mb-20 block mx-auto bg-gray-800 p-8 rounded-lg" onClick={() => setSignupStep(1)}><ChevronLeft size={20} /></button>
               <h1 className="auth-title">로그인 시 사용할<br />숫자 6자리를 입력해주세요</h1>
             </div>
             {renderPinInput(newPass, setNewPass)}
@@ -230,9 +231,9 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
         );
       case 3: // Password Confirm
         return (
-          <div className="auth-container">
+          <div className="auth-container relative">
+            <button className="absolute top-40 left-24 text-gray-500" onClick={() => setSignupStep(2)}><ChevronLeft size={24} /></button>
             <div className="auth-header">
-              <button className="text-gray-500 mb-20 block mx-auto bg-gray-800 p-8 rounded-lg" onClick={() => setSignupStep(2)}><ChevronLeft size={20} /></button>
               <h1 className="auth-title">비밀번호를<br />한 번 더 입력해 주세요</h1>
             </div>
             {renderPinInput(confirmPass, setConfirmPass)}
@@ -242,9 +243,9 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
         );
       case 4: // Monthly Goal
         return (
-          <div className="auth-container">
+          <div className="auth-container relative">
+            <button className="absolute top-40 left-24 text-gray-500" onClick={() => setSignupStep(3)}><ChevronLeft size={24} /></button>
             <div className="auth-header">
-              <button className="text-gray-500 mb-20 block mx-auto bg-gray-800 p-8 rounded-lg" onClick={() => setSignupStep(3)}><ChevronLeft size={20} /></button>
               <h1 className="auth-title">이번 달 목표 러닝 마일리지를<br />설정해 주세요</h1>
               <p className="auth-subtitle">내 속도에 맞는 목표를 정해보세요</p>
             </div>
