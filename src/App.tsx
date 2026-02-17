@@ -166,8 +166,15 @@ const LoginView = ({ onLogin, allMembers }: { onLogin: (name: string) => void, a
 };
 
 const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, currentWeek, challenges }: { group: Group | null, allGroups: Group[], team: Team | null, missions: Mission[], userInfo: any, onStartInput: () => void, currentWeek: number, challenges: WeeklyChallenge[] }) => {
-  const currentMission = missions.find(m => (team ? m.teamId === team.id : m.teamId === 'individual') && m.week === currentWeek);
+  const myMissions = missions.filter(m => (team ? m.teamId === team.id : m.teamId === 'individual') && m.week === currentWeek && m.userName === userInfo.name);
   const currentChallenge = challenges.find(c => c.week === currentWeek);
+
+  const aggregateStatus = myMissions.length === 0 ? 'none' :
+    myMissions.some(m => m.status === 'pending') ? 'pending' : 'approved';
+
+  const myPoints = missions.filter(m => m.userName === userInfo.name && m.status === 'approved' && m.type === '챌린지 인증').length * 10;
+  const teamMissions = team ? missions.filter(m => team.members.includes(m.userName) && m.status === 'approved' && m.type === '챌린지 인증') : [];
+  const teamPoints = teamMissions.length * 10;
 
   const sortedGroupsByDistance = [...allGroups].sort((a, b) => (b.totalDistance || 0) - (a.totalDistance || 0));
   const myGroupRank = group ? sortedGroupsByDistance.findIndex(g => g.id === group.id) + 1 : null;
@@ -179,7 +186,7 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
           <p className="text-green font-20 uppercase tracking-widest" style={{ fontWeight: 800 }}>{group ? 'GROUP' : 'INDIVIDUAL'}</p>
           {myGroupRank && <span className="text-white font-12 bold">전체 {myGroupRank}위</span>}
         </div>
-        <h1 className="main-title">{team ? team.name : userInfo.name}</h1>
+        <h1 className="main-title">{team ? `팀 ${team.name}` : userInfo.name}</h1>
       </div>
       {!group ? (
         <>
@@ -236,23 +243,13 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
           </div>
 
           <div className="group-mini-ranking mt-12 px-16">
-            {sortedGroupsByDistance.slice(0, 10).map((g, i) => (
-              <div key={g.id} className={`mini-rank-item ${group && g.id === group.id ? 'active' : ''}`}>
+            {(sortedGroupsByDistance as Group[]).slice(0, 10).map((g: Group, i: number) => (
+              <div key={g.id} className="mini-rank-item">
                 <span className="rank-num">{i + 1}</span>
                 <span className="group-name">{g.name}</span>
                 <span className="group-score">{(g.totalDistance || 0).toLocaleString()} km</span>
               </div>
             ))}
-            {group && myGroupRank && myGroupRank > 10 && (
-              <>
-                <div className="rank-divider my-8 border-t border-gray-800" />
-                <div className="mini-rank-item active">
-                  <span className="rank-num">{myGroupRank}</span>
-                  <span className="group-name">{group.name}</span>
-                  <span className="group-score">{(group.totalDistance || 0).toLocaleString()} km</span>
-                </div>
-              </>
-            )}
           </div>
 
           <div className="section-header flex-between px-16 mt-40">
@@ -296,18 +293,16 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
                 <h3 className="text-white">{currentWeek}주차 미션</h3>
                 <p className="text-gray font-14">{currentChallenge ? `${currentChallenge.title} (${currentChallenge.description.substring(0, 15)}...)` : '진행 중인 미션이 없습니다.'}</p>
               </div>
-              <div className={`status-pill ${currentMission?.status || 'none'}`}>
-                {currentMission?.status === 'approved' ? '승인완료' : currentMission?.status === 'pending' ? '승인대기' : '미제출'}
+              <div className={`status-pill ${aggregateStatus}`}>
+                {aggregateStatus === 'approved' ? '승인완료' : aggregateStatus === 'pending' ? '승인대기' : '미제출'}
               </div>
             </div>
 
-            {(!currentMission || currentMission.status === 'none') && (
-              <button className="btn-primary w-full mt-24 flex-center gap-8 py-20" onClick={onStartInput}>
-                <Camera size={20} /> 오늘의 러닝 인증하기
-              </button>
-            )}
+            <button className="btn-primary w-full mt-24 flex-center gap-8 py-20" onClick={onStartInput}>
+              <Camera size={20} /> {myMissions.length === 0 ? '오늘의 챌린지 인증하기' : '추가 인증하기'}
+            </button>
 
-            {currentMission?.status === 'pending' && (
+            {aggregateStatus === 'pending' && (
               <div className="info-box-alt mt-24">
                 <Zap size={18} className="text-green" />
                 <p className="font-14 text-white">그룹장이 미션을 확인 중입니다.</p>
@@ -316,17 +311,27 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
           </div>
 
           <div className="section-header flex-between px-16 mt-40">
-            <h3 className="section-title-alt">그룹 랭킹 현황</h3>
+            <h3 className="section-title-alt">{new Date().getMonth() + 1}월 그룹 랭킹</h3>
           </div>
 
           <div className="group-mini-ranking mt-12 px-16">
-            {sortedGroupsByDistance.slice(0, 3).map((g, i) => (
+            {(sortedGroupsByDistance as Group[]).slice(0, 5).map((g: Group, i: number) => (
               <div key={g.id} className={`mini-rank-item ${group && g.id === group.id ? 'active' : ''}`}>
                 <span className="rank-num">{i + 1}</span>
                 <span className="group-name">{g.name}</span>
                 <span className="group-score">{(g.totalDistance || 0).toLocaleString()} km</span>
               </div>
             ))}
+            {group && myGroupRank && myGroupRank > 5 && (
+              <>
+                <div className="rank-divider my-8 border-t border-gray-800" />
+                <div className="mini-rank-item active">
+                  <span className="rank-num">{myGroupRank}</span>
+                  <span className="group-name">{group.name}</span>
+                  <span className="group-score">{(group.totalDistance || 0).toLocaleString()} km</span>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="section-header flex-between px-16 mt-40">
@@ -337,28 +342,19 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
           <div className="stats-grid mt-12 px-16">
             <div className="stat-card">
               <div className="stat-card-header">
-                <Activity size={20} className="text-green" />
-                <p className="stat-card-title">Personal Bests</p>
+                <Zap size={20} className="text-green" />
+                <p className="stat-card-title">챌린지 포인트</p>
               </div>
 
-              <div className="pb-grid">
-                <div className="pb-item">
-                  <span className="pb-dist">1KM</span>
-                  <span className="pb-time">{userInfo.pbs['1KM']}</span>
+              <div className="points-display-v2 mt-12">
+                <div className="point-row-v2">
+                  <span className="label">나의 포인트</span>
+                  <span className="value">{myPoints} <small>pts</small></span>
                 </div>
-                <div className="pb-item">
-                  <span className="pb-dist">3KM</span>
-                  <span className="pb-time">{userInfo.pbs['3KM']}</span>
+                <div className="point-row-v2 mt-8">
+                  <span className="label truncate flex-1">{team ? `팀 ${team.name}` : '소속 팀'} 포인트</span>
+                  <span className="value">{teamPoints} <small>pts</small></span>
                 </div>
-                <div className="pb-item">
-                  <span className="pb-dist">5KM</span>
-                  <span className="pb-time">{userInfo.pbs['5KM']}</span>
-                </div>
-                <div className="pb-item">
-                  <span className="pb-dist">10KM</span>
-                  <span className="pb-time">{userInfo.pbs['10KM']}</span>
-                </div>
-
               </div>
             </div>
             <div className="stat-card">
@@ -388,49 +384,46 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
                     <span className="mileage-percent-txt">{Math.round((parseFloat(userInfo.monthlyDistance) / parseFloat(userInfo.monthlyGoal)) * 100)}% 달성</span>
                   </div>
                 </div>
-
               </div>
             </div>
-
-
           </div>
         </>
       )}
-    </div >
+    </div>
   );
 };
 
-const RankingView = ({ currentGroupId, userInfo }: { currentGroupId: string | null, userInfo: any }) => {
+const RankingView = ({ currentGroupId, userInfo, teams, missions }: { currentGroupId: string | null, userInfo: any, teams: Team[], missions: Mission[] }) => {
   const [rankTab, setRankTab] = useState<'team' | 'individual'>('team');
 
   const isGroupMode = !!currentGroupId;
 
-  // Team rankings (mock data for group context)
-  const teamRankings = [
-    { name: '버핏 레이서', score: 4410, members: 3 },
-    { name: '고스트러너', score: 3970, members: 3 },
-    { name: '스피드스타', score: 2850, members: 2 },
-  ];
+  // Calculate real team rankings based on challenge points
+  const teamRankings = isGroupMode
+    ? teams.filter(t => t.groupId === currentGroupId).map(t => {
+      const points = missions.filter(m => t.members.includes(m.userName) && m.status === 'approved' && m.type === '챌린지 인증').length * 10;
+      return { name: t.name, pts: points, members: t.members.length };
+    }).sort((a, b) => b.pts - a.pts)
+    : [];
 
   // Individual rankings within group
   const groupIndividualRankings = [
-    { name: userInfo.name, score: 1250, team: '버핏 레이서', pic: userInfo.profilePic, isMe: true, status: userInfo.statusMessage },
-    { name: '이러닝', score: 1180, team: '버핏 레이서', pic: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&h=100&auto=format&fit=crop", status: '오늘도 한계에 도전합니다! 🔥' },
-    { name: '강속도', score: 1050, team: '고스트러너', pic: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=100&h=100&auto=format&fit=crop", status: '부상의 산을 넘어 다시 달립니다.' },
-    { name: '박스프린트', score: 980, team: '버핏 레이서', pic: null, status: '서브4를 향하여! 🏅' },
-    { name: '조엔듀런스', score: 920, team: '고스트러너', pic: null, status: '천천히 가도 멈추지 않습니다.' },
-    { name: '런닝맨', score: 870, team: '스피드스타', pic: null, status: '바람을 가르는 러닝' },
-  ];
+    { name: userInfo.name, distance: parseFloat(userInfo.monthlyDistance), team: '버핏 레이서', pic: userInfo.profilePic, isMe: true, status: userInfo.statusMessage },
+    { name: '이러닝', distance: 128.5, team: '버핏 레이서', pic: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&h=100&auto=format&fit=crop", status: '오늘도 한계에 도전합니다! 🔥' },
+    { name: '강속도', distance: 115.2, team: '고스트러너', pic: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=100&h=100&auto=format&fit=crop", status: '부상의 산을 넘어 다시 달립니다.' },
+    { name: '박스프린트', distance: 98.4, team: '버핏 레이서', pic: null, status: '서브4를 향하여! 🏅' },
+    { name: '조엔듀런스', distance: 85.0, team: '고스트러너', pic: null, status: '천천히 가도 멈추지 않습니다.' },
+    { name: '런닝맨', distance: 72.3, team: '스피드스타', pic: null, status: '바람을 가르는 러닝' },
+  ].sort((a, b) => b.distance - a.distance);
 
   // Non-group individual rankings
-  // Non-group individual rankings
   const soloRankings = [
-    { name: userInfo.name, score: 1250, distance: userInfo.monthlyDistance, team: '-', pic: userInfo.profilePic, isMe: true, status: userInfo.statusMessage },
-    { name: '이러닝', score: 1180, distance: 128.5, team: '-', pic: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&h=100&auto=format&fit=crop", status: '오늘도 한계에 도전합니다! 🔥' },
-    { name: '강속도', score: 1050, distance: 115.2, team: '-', pic: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=100&h=100&auto=format&fit=crop", status: '부상의 산을 넘어 다시 달립니다.' },
-    { name: '박스프린트', score: 980, distance: 98.4, team: '-', pic: null, status: '서브4를 향하여! 🏅' },
-    { name: '조엔듀런스', score: 920, distance: 85.0, team: '-', pic: null, status: '천천히 가도 멈추지 않습니다.' },
-  ];
+    { name: userInfo.name, distance: parseFloat(userInfo.monthlyDistance), team: '-', pic: userInfo.profilePic, isMe: true, status: userInfo.statusMessage },
+    { name: '이러닝', distance: 128.5, team: '-', pic: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&h=100&auto=format&fit=crop", status: '오늘도 한계에 도전합니다! 🔥' },
+    { name: '강속도', distance: 115.2, team: '-', pic: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=100&h=100&auto=format&fit=crop", status: '부상의 산을 넘어 다시 달립니다.' },
+    { name: '박스프린트', distance: 98.4, team: '-', pic: null, status: '서브4를 향하여! 🏅' },
+    { name: '조엔듀런스', distance: 85.0, team: '-', pic: null, status: '천천히 가도 멈추지 않습니다.' },
+  ].sort((a, b) => b.distance - a.distance);
 
   const individualRankings = isGroupMode ? groupIndividualRankings : soloRankings;
 
@@ -457,17 +450,8 @@ const RankingView = ({ currentGroupId, userInfo }: { currentGroupId: string | nu
         )}
       </div>
       <div className="rank-pts-right">
-        {isGroupMode ? (
-          <>
-            <span className="rank-pts-num">{p.score.toLocaleString()}</span>
-            <span className="rank-pts-unit">pts</span>
-          </>
-        ) : (
-          <>
-            <span className="rank-pts-num">{p.distance}</span>
-            <span className="rank-pts-unit">km</span>
-          </>
-        )}
+        <span className="rank-pts-num">{p.distance.toLocaleString()}</span>
+        <span className="rank-pts-unit">km</span>
       </div>
     </div>
   );
@@ -514,7 +498,7 @@ const RankingView = ({ currentGroupId, userInfo }: { currentGroupId: string | nu
                   <p className="rank-team-v2">{t.members}명 참여</p>
                 </div>
                 <div className="rank-pts-right">
-                  <span className="rank-pts-num">{t.score.toLocaleString()}</span>
+                  <span className="rank-pts-num">{t.pts.toLocaleString()}</span>
                   <span className="rank-pts-unit">pts</span>
                 </div>
               </div>
@@ -567,14 +551,13 @@ const PBInputItem = ({ label, id, value, onChange }: { label: string, id: string
 );
 
 
-const ProfileView = ({ team, missions, userInfo, onUpdate, onEditMission }: { team: Team | null, missions: Mission[], userInfo: any, onUpdate: (n: string, s: string, p: string | null, d: string, pbs: any, goal?: string) => void, onEditMission: (m: Mission) => void }) => {
+const ProfileView = ({ team, missions, userInfo, onUpdate, onEditMission, onLogout }: { team: Team | null, missions: Mission[], userInfo: any, onUpdate: (n: string, s: string, p: string | null, d: string, pbs: any, goal?: string) => void, onEditMission: (m: Mission) => void, onLogout: () => void }) => {
 
 
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(userInfo.name);
   const [editStatus, setEditStatus] = useState(userInfo.statusMessage);
   const [editPic, setEditPic] = useState<string | null>(userInfo.profilePic);
-  const [editDist, setEditDist] = useState(userInfo.monthlyDistance);
   const [editGoal, setEditGoal] = useState(userInfo.monthlyGoal);
 
   const picInputRef = useRef<HTMLInputElement>(null);
@@ -610,7 +593,7 @@ const ProfileView = ({ team, missions, userInfo, onUpdate, onEditMission }: { te
       '10KM': formatPB(editPbs['10KM'].min, editPbs['10KM'].sec),
     };
 
-    onUpdate(editName, editStatus, editPic, editDist, finalPbs, editGoal);
+    onUpdate(editName, editStatus, editPic, userInfo.monthlyDistance, finalPbs, editGoal);
     setIsEditing(false);
   };
 
@@ -870,31 +853,14 @@ const ProfileView = ({ team, missions, userInfo, onUpdate, onEditMission }: { te
         </div>
 
 
-        <div className="px-20 mt-40 mb-12">
-          <h3 className="section-title-alt">서비스 설정</h3>
-        </div>
-        <div className="menu-list-wrap">
-          <div className="menu-item-premium px-20 py-18 flex-between">
-            <div className="flex items-center gap-12">
-              <Shield size={18} className="text-gray-500" />
-              <span className="text-gray-300 font-15">계정 및 보안</span>
-            </div>
-            <ArrowRight size={16} className="text-gray-800" />
-          </div>
-          <div className="menu-item-premium px-20 py-18 flex-between">
-            <div className="flex items-center gap-12">
-              <Zap size={18} className="text-gray-500" />
-              <span className="text-gray-300 font-15">알림 설정</span>
-            </div>
-            <ArrowRight size={16} className="text-gray-800" />
-          </div>
-          <div className="menu-item-premium px-20 py-18 flex-between">
-            <div className="flex items-center gap-12">
-              <Share2 size={18} className="text-gray-500" />
-              <span className="text-gray-300 font-15">친구 초대하기</span>
-            </div>
-            <ArrowRight size={16} className="text-gray-800" />
-          </div>
+        <div className="px-20 mt-40">
+          <button className="btn-logout-premium" onClick={() => {
+            if (window.confirm('로그아웃 하시겠습니까?')) {
+              onLogout();
+            }
+          }}>
+            <X size={18} /> 로그아웃
+          </button>
         </div>
       </div>
     </div>
@@ -905,8 +871,6 @@ import { createWorker } from 'tesseract.js';
 
 const DistanceExtractor = ({ onExtract, onImageSelect, distance, setDistance, isGroup }: { onExtract: (dist: string) => void, onImageSelect: (url: string) => void, distance: string, setDistance: (d: string) => void, isGroup: boolean }) => {
   const [loading, setLoading] = useState(false);
-  const [extracted, setExtracted] = useState<string | null>(null);
-  const [manualMode, setManualMode] = useState(false);
 
   const processImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
@@ -918,8 +882,6 @@ const DistanceExtractor = ({ onExtract, onImageSelect, distance, setDistance, is
     if (isGroup) return;
 
     setLoading(true);
-    setExtracted(null);
-    setManualMode(false);
 
     try {
       const worker = await createWorker('eng+kor');
@@ -933,7 +895,6 @@ const DistanceExtractor = ({ onExtract, onImageSelect, distance, setDistance, is
 
       if (match && match[1]) {
         const dist = match[1];
-        setExtracted(dist);
         onExtract(dist);
         setDistance(dist);
       } else {
@@ -942,11 +903,10 @@ const DistanceExtractor = ({ onExtract, onImageSelect, distance, setDistance, is
         const fallbackMatch = text.match(fallbackRegex);
         if (fallbackMatch && fallbackMatch[1]) {
           const dist = fallbackMatch[1];
-          setExtracted(dist);
           onExtract(dist);
           setDistance(dist);
         } else {
-          setManualMode(true);
+          // Manual mode can be handled by the UI state if needed, but for now we just allow manual entry
         }
       }
 
@@ -955,7 +915,6 @@ const DistanceExtractor = ({ onExtract, onImageSelect, distance, setDistance, is
     } catch (err) {
       console.error(err);
       alert('이미지 분석 중 오류가 발생했습니다. 직접 입력해주세요. (사진은 목록에 추가되었습니다)');
-      setManualMode(true);
     } finally {
       setLoading(false);
     }
@@ -1242,10 +1201,11 @@ const MissionInputView = ({ onBack, onSubmit, isGroup, challenge, initialMission
   );
 };
 
-const MissionCard = ({ mission, currentUserName, userRole, onLike, onComment, onDeleteMission, onDeleteComment }: {
+const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComment, onDeleteMission, onDeleteComment }: {
   mission: Mission,
   currentUserName: string,
   userRole: string,
+  teams: Team[],
   onLike: (id: string) => void,
   onComment: (id: string, text: string) => void,
   onDeleteMission?: (id: string) => void,
@@ -1255,6 +1215,8 @@ const MissionCard = ({ mission, currentUserName, userRole, onLike, onComment, on
   const isLiked = mission.likedBy.includes(currentUserName);
   const isAdmin = userRole === 'leader';
   const isAuthor = mission.userName === currentUserName;
+
+  const authorTeam = teams.find(t => t.id === mission.teamId) || teams.find(t => t.members.includes(mission.userName));
 
   const handleCommentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1269,8 +1231,11 @@ const MissionCard = ({ mission, currentUserName, userRole, onLike, onComment, on
         <div className="flex items-center gap-12">
           <div className="mission-user-avatar">{mission.userName.substring(0, 1)}</div>
           <div className="mission-user-info">
-            <p className="name">{mission.userName}</p>
-            <p className="meta">{mission.timestamp} · {mission.type}</p>
+            <div className="flex items-center gap-6">
+              <p className="name">{mission.userName}</p>
+              {authorTeam && <span className="font-12 text-gray-500 bg-gray-900 px-6 py-2 rounded-4">{authorTeam.name}</span>}
+            </div>
+            <p className="meta">{mission.timestamp} · {mission.type === '개인 러닝' ? '개인 러닝' : `${mission.week}주차 인증`}</p>
           </div>
         </div>
         {(isAdmin || isAuthor) && (
@@ -1345,6 +1310,7 @@ const WeeklyFeedView = ({
   missions,
   currentUserName,
   userRole,
+  teams,
   onLike,
   onComment,
   onDeleteMission,
@@ -1354,6 +1320,7 @@ const WeeklyFeedView = ({
   missions: Mission[],
   currentUserName: string,
   userRole: string,
+  teams: Team[],
   onLike: (id: string) => void,
   onComment: (id: string, text: string) => void,
   onDeleteMission?: (id: string) => void,
@@ -1374,6 +1341,7 @@ const WeeklyFeedView = ({
                 mission={m}
                 currentUserName={currentUserName}
                 userRole={userRole}
+                teams={teams}
                 onLike={onLike}
                 onComment={onComment}
                 onDeleteMission={onDeleteMission}
@@ -1461,7 +1429,7 @@ const ChallengeView = ({
           <motion.div
             layout
             key={c.id}
-            className={`card roadmap-card-alt ${i === 0 ? 'active' : ''} overflow-visible`}
+            className={`card roadmap-card-alt ${c.week === currentWeek ? 'active' : ''} overflow-visible`}
             onClick={() => {
               if (!editingId) setExpandedId(expandedId === c.id ? null : c.id);
             }}
@@ -1971,7 +1939,7 @@ const App: React.FC = () => {
     setUserGroupId(newGroupId);
     setUserRole('leader');
     const newTeamId = `t${Date.now()}`;
-    setTeams(prev => [...prev, { id: newTeamId, groupId: newGroupId, name: `${name} 01팀`, members: ['나(본인)'] }]);
+    setTeams(prev => [...prev, { id: newTeamId, groupId: newGroupId, name: `${name} 01팀`, members: [userInfo.name] }]);
     setUserTeamId(newTeamId);
     setShowOnboarding(false);
     setViewMode('group');
@@ -1984,7 +1952,11 @@ const App: React.FC = () => {
       setUserGroupId(group.id);
       setUserRole('user');
       const groupTeams = teams.filter(t => t.groupId === group.id);
-      if (groupTeams.length > 0) setUserTeamId(groupTeams[0].id);
+      if (groupTeams.length > 0) {
+        const targetTeamId = groupTeams[0].id;
+        setUserTeamId(targetTeamId);
+        setTeams(prev => prev.map(t => t.id === targetTeamId ? { ...t, members: t.members.includes(userInfo.name) ? t.members : [...t.members, userInfo.name] } : t));
+      }
       setShowOnboarding(false);
       setViewMode('group');
       setActiveTab('home');
@@ -2037,11 +2009,10 @@ const App: React.FC = () => {
     }
 
     setMissions(prev => {
-      // 주차별로 개인/그룹 미션은 각각 하나씩만 존재하도록 필터링
+      // 주차별로 여러 번 인증이 가능하도록 필터링 로직 제거
       const missionTypeTag = isIndividual ? '개인 러닝' : '챌린지 인증';
-      const filtered = prev.filter(m => !(m.userName === userInfo.name && m.week === currentPeriod && m.type === missionTypeTag));
 
-      return [...filtered, {
+      return [...prev, {
         id: `m${Date.now()}`,
         groupId: targetGroupId,
         teamId: targetTeamId,
@@ -2183,6 +2154,7 @@ const App: React.FC = () => {
             missions={filteredMissions}
             currentUserName={userInfo.name}
             userRole={userRole}
+            teams={teams}
             onLike={likeMission}
             onComment={addComment}
             onDeleteMission={deleteMission}
@@ -2190,8 +2162,31 @@ const App: React.FC = () => {
           />
         );
 
-      case 'ranking': return <RankingView currentGroupId={isGroupCtx ? userGroupId : null} userInfo={userInfo} />;
-      case 'profile': return <ProfileView team={isGroupCtx ? currentTeam || null : null} missions={missions} userInfo={userInfo} onUpdate={handleUpdateProfile} onEditMission={(m) => { setEditingMission(m); setIsInputView(true); }} />;
+      case 'ranking': return <RankingView currentGroupId={isGroupCtx ? userGroupId : null} userInfo={userInfo} teams={teams} missions={missions} />;
+      case 'profile': return (
+        <ProfileView
+          team={isGroupCtx ? currentTeam || null : null}
+          missions={missions}
+          userInfo={userInfo}
+          onUpdate={handleUpdateProfile}
+          onEditMission={(m) => { setEditingMission(m); setIsInputView(true); }}
+          onLogout={() => {
+            setUserInfo({
+              name: '',
+              statusMessage: '오늘도 즐겁게 달려요! 🏃‍♂️',
+              profilePic: null,
+              monthlyDistance: '42.1',
+              monthlyGoal: '100',
+              lastUpdatedMonth: new Date().getMonth() + 1,
+              pbs: { '1KM': "03'45\"", '3KM': "12'20\"", '5KM': "21'10\"", '10KM': "44'30\"" }
+            });
+            setUserGroupId(null);
+            setUserTeamId(null);
+            setUserRole('user');
+            setActiveTab('home');
+          }}
+        />
+      );
       case 'leader': return currentGroup ? (
 
         <LeaderView

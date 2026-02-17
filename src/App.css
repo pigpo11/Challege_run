@@ -222,7 +222,8 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 20px;
-  height: 24px;
+  height: auto;
+  min-height: 24px;
 }
 
 .stat-card-title {
@@ -231,6 +232,7 @@
   color: #8e8e93;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  white-space: nowrap;
 }
 
 
@@ -2728,4 +2730,57 @@
 
 .btn-edit-history-v2:active {
   transform: scale(0.95);
+}
+
+/* Challenge Points Style */
+.points-display-v2 {
+  display: flex;
+  flex-direction: column;
+}
+
+.point-row-v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.point-row-v2 .label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #8e8e93;
+}
+
+.point-row-v2 .value {
+  font-size: 24px;
+  font-weight: 900;
+  color: #fff;
+}
+
+.point-row-v2 .value small {
+  font-size: 14px;
+  color: var(--fit-green);
+  margin-left: 2px;
+}
+/* Logout Button Style */
+.btn-logout-premium {
+  width: 100%;
+  background: #1c1c1e;
+  color: #ff3b30;
+  border: none;
+  padding: 18px;
+  border-radius: 16px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.btn-logout-premium:active {
+  transform: scale(0.98);
+  background: #2c2c2e;
 }
