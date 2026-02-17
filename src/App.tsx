@@ -192,8 +192,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
                 autoFocus
               />
             </div>
-            {signupError && <p className="error-msg-premium">{signupError}</p>}
-            <div className="flex-1" />
+            {signupError && <p className="error-msg-premium text-center">{signupError}</p>}
             <button className="auth-btn-primary" disabled={!newName.trim()} onClick={nextSignupStep}>다음</button>
           </div>
         );
@@ -201,7 +200,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
         return (
           <div className="auth-container">
             <div className="auth-header">
-              <button className="text-gray-500 mb-20" onClick={() => setSignupStep(1)}><ChevronLeft size={24} /></button>
+              <button className="text-gray-500 mb-20 block mx-auto" onClick={() => setSignupStep(1)}><ChevronLeft size={24} /></button>
               <h1 className="auth-title">로그인 시 사용할<br />숫자 6자리를 입력해주세요</h1>
             </div>
             <div className="auth-input-wrapper">
@@ -215,7 +214,6 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
                 autoFocus
               />
             </div>
-            <div className="flex-1" />
             <button className="auth-btn-primary" disabled={newPass.length < 6} onClick={nextSignupStep}>다음</button>
           </div>
         );
@@ -223,7 +221,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
         return (
           <div className="auth-container">
             <div className="auth-header">
-              <button className="text-gray-500 mb-20" onClick={() => setSignupStep(2)}><ChevronLeft size={24} /></button>
+              <button className="text-gray-500 mb-20 block mx-auto" onClick={() => setSignupStep(2)}><ChevronLeft size={24} /></button>
               <h1 className="auth-title">비밀번호를<br />한 번 더 입력해 주세요</h1>
             </div>
             <div className="auth-input-wrapper">
@@ -237,8 +235,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
                 autoFocus
               />
             </div>
-            {signupError && <p className="error-msg-premium">{signupError}</p>}
-            <div className="flex-1" />
+            {signupError && <p className="error-msg-premium text-center">{signupError}</p>}
             <button className="auth-btn-primary" disabled={confirmPass.length < 6} onClick={nextSignupStep}>다음</button>
           </div>
         );
@@ -246,7 +243,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
         return (
           <div className="auth-container">
             <div className="auth-header">
-              <button className="text-gray-500 mb-20" onClick={() => setSignupStep(3)}><ChevronLeft size={24} /></button>
+              <button className="text-gray-500 mb-20 block mx-auto" onClick={() => setSignupStep(3)}><ChevronLeft size={24} /></button>
               <h1 className="auth-title">이번 달 목표 러닝 마일리지를<br />설정해 주세요</h1>
               <p className="auth-subtitle">내 속도에 맞는 목표를 정해보세요</p>
             </div>
@@ -261,7 +258,6 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
               />
               <span className="text-white font-20 ml-8">km</span>
             </div>
-            <div className="flex-1" />
             <button className="auth-btn-primary" onClick={handleSignupComplete}>시작하기</button>
           </div>
         );
@@ -273,9 +269,9 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
 
   return (
     <div className="auth-container">
-      <div className="flex-center flex-col py-60">
-        <Zap size={48} className="text-green mb-16" />
-        <h1 className="text-white text-32 bold">10km 릴레이 TT</h1>
+      <div className="flex-center flex-col mb-48">
+        <Zap size={48} fill="#3a82f6" color="#3a82f6" className="mb-16" />
+        <h1 className="text-white text-32 bold">Challenge Epi</h1>
       </div>
 
       <div className="auth-input-group">

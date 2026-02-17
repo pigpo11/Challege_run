@@ -2761,6 +2761,7 @@
   color: var(--fit-green);
   margin-left: 2px;
 }
+
 /* Logout Button Style */
 .btn-logout-premium {
   width: 100%;
@@ -2790,13 +2791,14 @@
   padding: 40px 24px;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   height: 100%;
   background-color: #000;
 }
 
 .auth-header {
-  margin-top: 40px;
   margin-bottom: 60px;
+  text-align: center;
 }
 
 .auth-title {
@@ -2847,8 +2849,8 @@
 }
 
 .auth-btn-primary {
-  background: #3a82f6;
-  color: #fff;
+  background: var(--fit-green);
+  color: #000;
   border: none;
   border-radius: 16px;
   height: 64px;
