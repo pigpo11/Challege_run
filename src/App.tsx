@@ -63,7 +63,7 @@ const OnboardingView = ({ onCreate, onJoin, onBack, allGroupNames }: { onCreate:
         <div className="onboarding-icon-box mx-auto mb-20">
           <Activity size={36} className="text-green" />
         </div>
-        <h1 className="text-white text-32 bold tracking-tight">10km TT 릴레이</h1>
+        <h1 className="text-white text-32 bold tracking-tight">TT Challenge</h1>
         <p className="text-gray mt-12 font-15">그룹을 생성하거나 초대코드로 참여하세요</p>
       </div>
 
@@ -2652,7 +2652,7 @@ const App: React.FC = () => {
     <div className="app-wrapper">
       {!isInputView && !showOnboarding && userInfo.name && (
         <header className="main-header">
-          <h2 className="header-title">10km 릴레이 TT</h2>
+          <h2 className="header-title">TT Challenge</h2>
           <button className="group-header-btn" onClick={handleGroupBtnClick}>{viewMode === 'group' ? 'INDIVIDUAL' : 'GROUP'}</button>
         </header>
       )}
