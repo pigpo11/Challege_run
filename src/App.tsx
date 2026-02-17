@@ -327,7 +327,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
             <button className="auth-back-btn" onClick={() => { setNewGoal('100'); setSignupStep(3); }}><ChevronLeft size={28} /></button>
             <div className="auth-header">
               <h1 className="auth-title">이번 달 목표 러닝 마일리지를<br />설정해 주세요</h1>
-              <p className="auth-subtitle">내 속도에 맞는 목표를 정해보세요</p>
+              <p className="auth-subtitle">나에게 맞는 목표를 정해보세요</p>
             </div>
             <div className="auth-input-wrapper">
               <input
