@@ -54,6 +54,7 @@ body {
   position: relative;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 h1,
@@ -449,4 +450,30 @@ p {
 
 .fill-green {
   fill: var(--fit-green);
+}
+
+.hover-opacity {
+  transition: opacity 0.2s;
+}
+
+.hover-opacity:hover {
+  opacity: 0.7;
+}
+
+.hover-opacity:active {
+  opacity: 0.5;
+  transform: scale(0.98);
+}
+
+/* 추가 스타일: 사이클링 중인 배지에 강조 표시 */
+.cursor-pointer.rank-team-text-v2 {
+  background: var(--fit-green-dim);
+  color: var(--fit-green);
+  border: 1px solid var(--fit-green-dark);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }

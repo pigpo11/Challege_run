@@ -41,6 +41,16 @@ export async function updateProfile(profileId: string, updates: Record<string, a
     return data;
 }
 
+export async function getFullProfile(profileId: string) {
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', profileId)
+        .single();
+    if (error) return null;
+    return data;
+}
+
 // ============================================
 // Groups
 // ============================================

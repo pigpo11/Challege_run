@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Home, Trophy, Calendar, Settings, ChevronLeft, Camera, Check, Plus, ArrowRight, Activity, Zap, Share2, UserPlus, Shield, User, Trash, Edit2, X, MoreVertical, Heart, MessageCircle, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createWorker } from 'tesseract.js';
+import * as db from './lib/database';
 import './App.css';
 
 type Group = {
@@ -256,7 +257,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
                 ref.current?.focus();
               }}
             >
-              {value[i] || '-'}
+              {value[i] ? (i < value.length - 1 ? '*' : value[i]) : '-'}
             </div>
           ))}
           <input
@@ -416,7 +417,7 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
       </div>
       {!group ? (
         <>
-          <div className="px-16 mt-32">
+          <div className="mt-32">
             <div className="distance-hero-card">
               <div className="flex-between">
                 <div className="flex items-center gap-12">
@@ -456,7 +457,7 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
             <div className="verification-hero-card mt-16">
               <div className="verif-text-group">
                 <h3 className="text-white font-16 bold">오늘의 러닝 인증하기</h3>
-                <p className="text-gray-500 font-13">러닝 기록을 남기고 성장을 확인하세요 🔥</p>
+                <p className="text-gray-500 font-13">기록을 남기고 성장을 확인하세요🔥</p>
               </div>
               <button className="camera-action-btn" onClick={onStartInput}>
                 <Camera size={24} />
@@ -464,11 +465,11 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
             </div>
           </div>
 
-          <div className="section-header flex-between px-16 mt-40">
+          <div className="section-header flex-between mt-40">
             <h3 className="section-title-alt">그룹 랭킹</h3>
           </div>
 
-          <div className="group-mini-ranking mt-12 px-16">
+          <div className="group-mini-ranking mt-12">
             {(sortedGroupsByDistance as Group[]).slice(0, 10).map((g: Group, i: number) => (
               <div key={g.id} className="mini-rank-item">
                 <span className="rank-num">{i + 1}</span>
@@ -478,12 +479,12 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
             ))}
           </div>
 
-          <div className="section-header flex-between px-16 mt-40">
+          <div className="section-header flex-between mt-40">
             <h3 className="section-title-alt">활동 퍼포먼스</h3>
           </div>
 
-          <div className="mt-12 px-16">
-            <div className="stat-card" style={{ width: '100%' }}>
+          <div className="mt-12">
+            <div className="stat-card" style={{ width: '100%', minHeight: 'auto' }}>
               <div className="stat-card-header">
                 <Activity size={18} className="text-green" />
                 <p className="stat-card-title">Personal Bests</p>
@@ -536,11 +537,11 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
             )}
           </div>
 
-          <div className="section-header flex-between px-16 mt-40">
+          <div className="section-header flex-between mt-40">
             <h3 className="section-title-alt">{new Date().getMonth() + 1}월 그룹 랭킹</h3>
           </div>
 
-          <div className="group-mini-ranking mt-12 px-16">
+          <div className="group-mini-ranking mt-12">
             {(sortedGroupsByDistance as Group[]).slice(0, 5).map((g: Group, i: number) => (
               <div key={g.id} className={`mini-rank-item ${group && g.id === group.id ? 'active' : ''}`}>
                 <span className="rank-num">{i + 1}</span>
@@ -560,12 +561,12 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
             )}
           </div>
 
-          <div className="section-header flex-between px-16 mt-40">
+          <div className="section-header flex-between mt-40">
             <h3 className="section-title-alt">활동 퍼포먼스</h3>
             <ArrowRight size={18} color="#48484A" />
           </div>
 
-          <div className="stats-grid mt-12 px-16">
+          <div className="stats-grid mt-12">
             <div className="stat-card">
               <div className="stat-card-header">
                 <Zap size={20} className="text-green" />
@@ -619,27 +620,55 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
   );
 };
 
-const RankingView = ({ currentGroupId, userInfo, teams, missions }: { currentGroupId: string | null, userInfo: any, teams: Team[], missions: Mission[] }) => {
+const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGroupIds }: { currentGroupId: string | null, userInfo: any, teams: Team[], missions: Mission[], groups: Group[], myGroupIds: string[] }) => {
   const [rankTab, setRankTab] = useState<'team' | 'individual'>('team');
+  const [displayGroupIdx, setDisplayGroupIdx] = useState(0);
 
   const isGroupMode = !!currentGroupId;
+  const currentMonth = new Date().getMonth() + 1;
+  const currentYear = new Date().getFullYear();
 
-  // Calculate real team rankings based on challenge points
+  // 이번 달 미션만 필터링 (랭킹용)
+  const currentMonthMissions = missions.filter(m => {
+    const d = new Date(m.timestamp || new Date());
+    return (d.getMonth() + 1) === currentMonth && d.getFullYear() === currentYear;
+  });
+
+  // 내가 속한 실제 그룹 객체 리스트
+  const myJoinedGroups = groups.filter(g => myGroupIds.includes(g.id));
+
+  // 표시할 그룹 이름 결정 (개인 모드용)
+  const getDisplayGroupName = () => {
+    if (myJoinedGroups.length === 0) return '-';
+    const idx = displayGroupIdx % myJoinedGroups.length;
+    return myJoinedGroups[idx].name;
+  };
+
+  const handleGroupCycle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (myJoinedGroups.length > 1) {
+      setDisplayGroupIdx(prev => prev + 1);
+    }
+  };
+
+  // Calculate real team rankings based on challenge points (this month only)
   const teamRankings = isGroupMode
     ? teams.filter(t => t.groupId === currentGroupId).map(t => {
-      const points = missions.filter(m => t.members.includes(m.userName) && m.status === 'approved' && m.type === '챌린지 인증').length * 10;
+      const points = currentMonthMissions.filter(m => t.members.includes(m.userName) && m.status === 'approved' && m.type === '챌린지 인증').length * 10;
       return { name: t.name, pts: points, members: t.members.length };
     }).sort((a, b) => b.pts - a.pts)
     : [];
 
-  // Individual rankings within group
-  // Individual rankings derived from missions (mocked for demo, but should use real user data in production)
-  // For now, we only show the current user in a clean start
+  // Individual rankings within group or global (this month only)
   const individualRankings = [
     {
       name: userInfo.name,
-      distance: parseFloat(userInfo.monthlyDistance),
-      team: isGroupMode ? (teams.find(t => t.members.includes(userInfo.name))?.name || '-') : '-',
+      distance: currentMonthMissions
+        .filter(m => m.userName === userInfo.name && m.status === 'approved')
+        .reduce((sum, m) => sum + (m.distance || 0), 0),
+      displayTag: isGroupMode
+        ? (teams.find(t => t.members.includes(userInfo.name))?.name || '-')
+        : getDisplayGroupName(),
       pic: userInfo.profilePic,
       isMe: true,
       status: userInfo.statusMessage
@@ -662,7 +691,13 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions }: { currentGro
             {p.name}
             {p.isMe && <span className="me-badge-v2">나</span>}
           </p>
-          <span className="rank-team-text-v2">{p.team}</span>
+          <span
+            className={`rank-team-text-v2 ${!isGroupMode && myJoinedGroups.length > 1 ? 'cursor-pointer hover-opacity' : ''}`}
+            onClick={!isGroupMode ? handleGroupCycle : undefined}
+            title={!isGroupMode && myJoinedGroups.length > 1 ? "클릭하여 그룹 전환" : ""}
+          >
+            {p.displayTag}
+          </span>
         </div>
         {p.status && (
           <p className="rank-status-v2-new mt-4">{p.status}</p>
@@ -853,7 +888,7 @@ const ProfileView = ({
   const myHistory = missions.filter(m => m.teamId === (team ? team.id : 'individual') && m.status !== 'none');
 
   return (
-    <div className="page-container pb-60 px-16">
+    <div className="page-container pb-60">
       {/* Clean Profile Header */}
       <div className="profile-header-wrap-v3 px-20 pt-40 pb-32">
         {isEditing ? (
@@ -947,7 +982,7 @@ const ProfileView = ({
       </div>
 
       {/* Activity Statistics Grid */}
-      <div className="-mt-16 px-16">
+      <div className="-mt-16">
         <div className="stats-grid mt-12">
 
 
@@ -1314,45 +1349,37 @@ const MissionInputView = ({ onBack, onSubmit, isGroup, challenge, initialMission
           <DistanceExtractor onExtract={handleExtractedDistance} onImageSelect={handleExtractedImage} distance={runDistance} setDistance={setRunDistance} isGroup={isGroup} />
         )}
 
-        <div className={!isGroup ? "mt-8" : "mt-0"}>
-          <div className="flex-between mb-16">
-            <h3 className="text-white font-18 bold">인증 사진 <span className="text-gray-600 font-13 font-normal ml-8">{photos.length}/7</span></h3>
-          </div>
-
-          <div className="photo-upload-area">
-            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" multiple onChange={handleFileChange} />
-            <div className="photo-upload-grid">
-              {photos.map((p, i) => (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  key={i}
-                  className="photo-preview shadow-lg"
-                >
-                  <img src={p} alt="Certification" className="w-full h-full object-cover rounded-20" />
-                  <button className="btn-remove-photo" onClick={() => removePhoto(i)}>
-                    <X size={14} />
-                  </button>
-                </motion.div>
-              ))}
-              {photos.length < 7 && (
-                <div onClick={() => fileInputRef.current?.click()} className="photo-add-btn">
-                  <Camera size={24} className="text-gray-500" />
-                </div>
-              )}
-
+        {isGroup && (
+          <div className="mt-0">
+            <div className="flex-between mb-16">
+              <h3 className="text-white font-18 bold">인증 사진 <span className="text-gray-600 font-13 font-normal ml-8">{photos.length}/7</span></h3>
             </div>
 
-            {!isGroup && photos.length === 0 && (
-              <div className="cert-photo-empty">
-                <div className="w-48 h-48 bg-gray-900 rounded-full flex-center mx-auto mb-16">
-                  <Camera size={20} className="text-gray-700" />
-                </div>
-                <p className="text-gray-600 font-14">분석된 인증 사진이 나타납니다.</p>
+            <div className="photo-upload-area">
+              <input type="file" ref={fileInputRef} className="hidden" accept="image/*" multiple onChange={handleFileChange} />
+              <div className="photo-upload-grid">
+                {photos.map((p, i) => (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    key={i}
+                    className="photo-preview shadow-lg"
+                  >
+                    <img src={p} alt="Certification" className="w-full h-full object-cover rounded-20" />
+                    <button className="btn-remove-photo" onClick={() => removePhoto(i)}>
+                      <X size={14} />
+                    </button>
+                  </motion.div>
+                ))}
+                {photos.length < 7 && (
+                  <div onClick={() => fileInputRef.current?.click()} className="photo-add-btn">
+                    <Camera size={24} className="text-gray-500" />
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
 
 
 
@@ -2156,8 +2183,7 @@ const LeaderView = ({
   );
 };
 const App: React.FC = () => {
-  // --- Import database functions ---
-  const db = React.useMemo(() => import('./lib/database'), []);
+  // --- Database module is now statically imported as 'db' ---
 
   const [activeTab, setActiveTab] = useState('home');
   const [viewWeek, setViewWeek] = useState<number | null>(null);
@@ -2170,11 +2196,12 @@ const App: React.FC = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showGroupSelector, setShowGroupSelector] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Profile state - includes supabase profile ID
   const [profileId, setProfileId] = useState<string | null>(() => localStorage.getItem('profileId'));
   const [myGroupIds, setMyGroupIds] = useState<string[]>([]);
-  const [allUsers] = useState<any[]>([]);
+  const [allUserNames, setAllUserNames] = useState<string[]>([]);
   const [userInfo, setUserInfo] = useState({
     name: '',
     profilePic: null as string | null,
@@ -2196,10 +2223,15 @@ const App: React.FC = () => {
   // Load data from Supabase on mount / login
   // ============================================
   const loadUserData = React.useCallback(async (pId: string, nickname: string) => {
-    const dbModule = await db;
     try {
-      // Load my groups
-      const myGroups = await dbModule.getMyGroups(pId);
+      // Use Promise.all for parallel loading
+      const [myGroups, challengeList, profile] = await Promise.all([
+        db.getMyGroups(pId),
+        db.getChallenges(),
+        db.getFullProfile(pId)
+      ]);
+
+      // 1. Process Groups
       const groupList: Group[] = myGroups.map((g: any) => ({
         id: g.id,
         name: g.name,
@@ -2211,76 +2243,115 @@ const App: React.FC = () => {
       setGroups(groupList);
       setMyGroupIds(groupList.map(g => g.id));
 
-      // Load challenges
-      const challengeList = await dbModule.getChallenges();
+      // 2. Process Challenges
       setChallenges(challengeList);
 
-      // If user has groups, load first group's data
+      // 3. Process Profile & Refresh dependencies
+      if (profile) {
+        const currentMonth = new Date().getMonth() + 1;
+        const dbMonth = profile.last_updated_month || currentMonth;
+
+        if (dbMonth !== currentMonth) {
+          console.log(`Month changed (${dbMonth} -> ${currentMonth}). Resetting distance.`);
+          await db.updateProfile(pId, {
+            monthly_distance: '0',
+            last_updated_month: currentMonth
+          });
+
+          setUserInfo(prev => ({
+            ...prev,
+            name: profile.nickname,
+            profilePic: profile.profile_pic,
+            statusMessage: profile.status_message,
+            monthlyDistance: '0',
+            lastUpdatedMonth: currentMonth,
+            monthlyGoal: profile.monthly_goal || '100',
+            pbs: profile.pbs || prev.pbs
+          }));
+        } else {
+          setUserInfo({
+            name: profile.nickname,
+            profilePic: profile.profile_pic,
+            statusMessage: profile.status_message,
+            monthlyDistance: profile.monthly_distance || '0',
+            lastUpdatedMonth: profile.last_updated_month || currentMonth,
+            monthlyGoal: profile.monthly_goal || '100',
+            pbs: profile.pbs || { '1KM': "00'00\"", '3KM': "00'00\"", '5KM': "00'00\"", '10KM': "00'00\"" }
+          });
+        }
+      }
+
+      // 4. Load initial group data if applicable
       if (groupList.length > 0) {
         const firstGroup = groupList[0];
-        const role = myGroups[0]?.myRole === 'leader' ? 'leader' : 'user';
+        const userGroupData = myGroups.find((g: any) => g.id === firstGroup.id);
+        const role = userGroupData?.myRole === 'leader' ? 'leader' : 'user';
+
         setUserGroupId(firstGroup.id);
         setUserRole(role as 'user' | 'leader');
         setViewMode('group');
 
-        // Load teams for this group
-        const teamList = await dbModule.getTeamsByGroup(firstGroup.id);
-        setTeams(teamList);
+        // Parallel load for group specific data
+        const [teamList, membersList, missionList] = await Promise.all([
+          db.getTeamsByGroup(firstGroup.id),
+          db.getGroupMembers(firstGroup.id),
+          db.getMissionsByGroup(firstGroup.id)
+        ]);
 
-        // Find my team
+        setTeams(teamList);
         const myTeam = teamList.find((t: any) => t.members.includes(nickname));
         setUserTeamId(myTeam ? myTeam.id : null);
-
-        // Load group members
-        const members = await dbModule.getGroupMembers(firstGroup.id);
-        setGroupMembers(members.map((m: any) => m.nickname));
-
-        // Load missions for this group
-        const missionList = await dbModule.getMissionsByGroup(firstGroup.id);
+        setGroupMembers(membersList.map((m: any) => m.nickname));
         setMissions(missionList);
       } else {
-        // Load individual missions
-        const missionList = await dbModule.getIndividualMissions(pId);
-        setMissions(missionList);
+        const indMissions = await db.getIndividualMissions(pId);
+        setMissions(indMissions);
       }
+
     } catch (e) {
-      console.error('Failed to load user data:', e);
+      console.error('Data Loading Error:', e);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [db]);
+  }, []); // Only recreate if static imports change (never)
 
   // On mount: check if user was previously logged in
   useEffect(() => {
-    const savedProfileId = localStorage.getItem('profileId');
-    const savedUserInfo = localStorage.getItem('userInfo');
-    if (savedProfileId && savedUserInfo) {
-      const info = JSON.parse(savedUserInfo);
-      if (info.name) {
-        setProfileId(savedProfileId);
+    if (profileId && !userInfo.name) {
+      // Re-hydrate info from localStorage first for faster UI response
+      const cached = localStorage.getItem('userInfo');
+      if (cached) {
+        const info = JSON.parse(cached);
         setUserInfo(info);
-        loadUserData(savedProfileId, info.name);
-        return;
+        loadUserData(profileId, info.name);
+      } else {
+        setLoading(false); // No data to load
       }
+    } else if (!profileId) {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [loadUserData]);
+  }, [profileId, loadUserData]);
+
+  // Load all user names for duplicate nickname check during signup
+  useEffect(() => {
+    db.getAllUserNames().then(names => setAllUserNames(names)).catch(console.error);
+  }, []);
 
   // Reload group data when switching groups
   const loadGroupData = React.useCallback(async (groupId: string) => {
-    const dbModule = await db;
     try {
-      const teamList = await dbModule.getTeamsByGroup(groupId);
+      const [teamList, members, missionList] = await Promise.all([
+        db.getTeamsByGroup(groupId),
+        db.getGroupMembers(groupId),
+        db.getMissionsByGroup(groupId)
+      ]);
       setTeams(teamList);
-
-      const members = await dbModule.getGroupMembers(groupId);
       setGroupMembers(members.map((m: any) => m.nickname));
-
-      const missionList = await dbModule.getMissionsByGroup(groupId);
       setMissions(missionList);
     } catch (e) {
       console.error('Failed to load group data:', e);
     }
-  }, [db]);
+  }, []);
 
   // ============================================
   // Challenges (Supabase-backed)
@@ -2288,8 +2359,7 @@ const App: React.FC = () => {
   const addChallenge = async () => {
     const nextWeek = challenges.length > 0 ? Math.max(...challenges.map((c: any) => c.week)) + 1 : 1;
     try {
-      const dbModule = await db;
-      const created = await dbModule.addChallengeDB(nextWeek, '새로운 훈련', '훈련 내용을 입력해주세요.');
+      const created = await db.addChallengeDB(nextWeek, '새로운 훈련', '훈련 내용을 입력해주세요.');
       setChallenges(prev => [...prev, { id: created.id, week: created.week, title: created.title, description: created.description, recordFields: created.record_fields || [] }]);
     } catch (e) {
       console.error('Failed to add challenge:', e);
@@ -2298,8 +2368,7 @@ const App: React.FC = () => {
 
   const updateChallenge = async (id: string, title: string, desc: string, fields?: any[]) => {
     try {
-      const dbModule = await db;
-      await dbModule.updateChallengeDB(id, title, desc, fields);
+      await db.updateChallengeDB(id, title, desc, fields);
       setChallenges((prev: any) => prev.map((c: any) => c.id === id ? { ...c, title, description: desc, recordFields: fields || c.recordFields } : c));
     } catch (e) {
       console.error('Failed to update challenge:', e);
@@ -2309,8 +2378,7 @@ const App: React.FC = () => {
   const deleteChallenge = async (id: string) => {
     if (window.confirm('이 주차의 챌린지를 삭제하시겠습니까?')) {
       try {
-        const dbModule = await db;
-        await dbModule.deleteChallengeDB(id);
+        await db.deleteChallengeDB(id);
         setChallenges((prev: any) => prev.filter((c: any) => c.id !== id));
       } catch (e) {
         console.error('Failed to delete challenge:', e);
@@ -2322,17 +2390,24 @@ const App: React.FC = () => {
   // Groups (Supabase-backed)
   // ============================================
   const handleCreateGroup = async (name: string) => {
-    if (!profileId) return;
+    if (!profileId || isSubmitting) return;
+
+    setIsSubmitting(true);
     const newInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
     try {
-      const dbModule = await db;
-      const group = await dbModule.createGroup(name, profileId, newInviteCode);
+      // 1. 그룹 생성
+      const group = await db.createGroup(name, profileId, newInviteCode);
+      if (!group) throw new Error('그룹 정보를 생성할 수 없습니다.');
 
-      // Create default team
-      const team = await dbModule.createTeam(group.id, `${name} 01팀`);
-      await dbModule.addTeamMember(team.id, profileId);
+      // 2. 기본 팀 생성
+      const team = await db.createTeam(group.id, `${name} 01팀`);
 
-      const newGroup: Group = {
+      // 3. 팀 멤버 추가
+      await db.addTeamMember(team.id, profileId);
+
+      // 4. 로컬 상태 업데이트
+      const newGroupObj: Group = {
         id: group.id,
         name: group.name,
         leaderId: group.leader_id,
@@ -2341,27 +2416,37 @@ const App: React.FC = () => {
         totalDistance: 0
       };
 
-      setGroups(prev => [...prev, newGroup]);
+      setGroups(prev => [...prev, newGroupObj]);
       setMyGroupIds(prev => [...prev, group.id]);
       setUserGroupId(group.id);
       setUserRole('leader');
-      setTeams(prev => [...prev, { id: team.id, groupId: group.id, name: `${name} 01팀`, members: [userInfo.name] }]);
+      setTeams(prev => [...prev, {
+        id: team.id,
+        groupId: group.id,
+        name: `${name} 01팀`,
+        members: [userInfo.name]
+      }]);
       setUserTeamId(team.id);
       setGroupMembers([userInfo.name]);
+
+      // 5. 뷰 전환
       setShowOnboarding(false);
       setShowGroupSelector(false);
       setViewMode('group');
       setActiveTab('leader');
+
     } catch (e: any) {
-      alert('그룹 생성 실패: ' + (e.message || ''));
+      console.error('Group Creation Error:', e);
+      alert('그룹 생성 중 오류가 발생했습니다: ' + (e.message || '알 수 없는 오류'));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleJoinGroup = async (code: string) => {
     if (!profileId) return;
     try {
-      const dbModule = await db;
-      const group = await dbModule.getGroupByInviteCode(code);
+      const group = await db.getGroupByInviteCode(code);
       if (!group) {
         alert('유효하지 않은 초대코드입니다.');
         return;
@@ -2371,12 +2456,12 @@ const App: React.FC = () => {
         return;
       }
 
-      await dbModule.joinGroup(group.id, profileId);
+      await db.joinGroup(group.id, profileId);
 
       // Add to first team
-      const teamList = await dbModule.getTeamsByGroup(group.id);
+      const teamList = await db.getTeamsByGroup(group.id);
       if (teamList.length > 0) {
-        await dbModule.addTeamMember(teamList[0].id, profileId);
+        await db.addTeamMember(teamList[0].id, profileId);
       }
 
       const newGroup: Group = {
@@ -2412,8 +2497,7 @@ const App: React.FC = () => {
     setUserInfo((prev: any) => ({ ...prev, name, statusMessage: status, profilePic: pic, monthlyDistance: dist, pbs, monthlyGoal: goal || prev.monthlyGoal }));
     if (profileId) {
       try {
-        const dbModule = await db;
-        await dbModule.updateProfile(profileId, {
+        await db.updateProfile(profileId, {
           status_message: status,
           profile_pic: pic,
           monthly_distance: parseFloat(dist) || 0,
@@ -2433,8 +2517,7 @@ const App: React.FC = () => {
   const approveMission = async (missionId: string) => {
     setMissions((prev: any) => prev.map((m: any) => m.id === missionId ? { ...m, status: 'approved' } : m));
     try {
-      const dbModule = await db;
-      await dbModule.approveMission(missionId);
+      await db.approveMission(missionId);
     } catch (e) {
       console.error('Failed to approve mission:', e);
     }
@@ -2469,16 +2552,14 @@ const App: React.FC = () => {
         return updated;
       });
       if (profileId) {
-        const dbModule = await db;
         const currentMonth = new Date().getMonth() + 1;
         const baseDist = userInfo.lastUpdatedMonth !== currentMonth ? 0 : parseFloat(userInfo.monthlyDistance);
-        await dbModule.updateProfile(profileId, { monthly_distance: baseDist + addedDist, last_updated_month: currentMonth });
+        await db.updateProfile(profileId, { monthly_distance: baseDist + addedDist, last_updated_month: currentMonth });
       }
     }
 
     try {
-      const dbModule = await db;
-      const created = await dbModule.submitMission({
+      const created = await db.submitMission({
         groupId: isIndividual ? null : userGroupId,
         teamId: isIndividual ? null : userTeamId,
         profileId,
@@ -2521,8 +2602,7 @@ const App: React.FC = () => {
       return { ...m, likedBy: isLiked ? m.likedBy.filter((n: string) => n !== userInfo.name) : [...m.likedBy, userInfo.name] };
     }));
     try {
-      const dbModule = await db;
-      await dbModule.toggleLike(id, userInfo.name);
+      await db.toggleLike(id, userInfo.name);
     } catch (e) {
       console.error('Failed to toggle like:', e);
     }
@@ -2531,8 +2611,7 @@ const App: React.FC = () => {
   const addCommentHandler = async (missionId: string, text: string) => {
     if (!profileId) return;
     try {
-      const dbModule = await db;
-      const created = await dbModule.addComment(missionId, profileId, userInfo.name, text);
+      const created = await db.addComment(missionId, profileId, userInfo.name, text);
       const newComment: Comment = { id: created.id, userName: created.user_name, text: created.text, timestamp: created.created_at };
       setMissions((prev: any) => prev.map((m: any) => m.id === missionId ? { ...m, comments: [...m.comments, newComment] } : m));
     } catch (e) {
@@ -2544,8 +2623,7 @@ const App: React.FC = () => {
     if (window.confirm('인증 게시물을 삭제하시겠습니까?')) {
       setMissions((prev: any) => prev.filter((m: any) => m.id !== id));
       try {
-        const dbModule = await db;
-        await dbModule.deleteMission(id);
+        await db.deleteMission(id);
       } catch (e) {
         console.error('Failed to delete mission:', e);
       }
@@ -2558,8 +2636,7 @@ const App: React.FC = () => {
         m.id === missionId ? { ...m, comments: m.comments.filter((c: any) => c.id !== commentId) } : m
       ));
       try {
-        const dbModule = await db;
-        await dbModule.deleteComment(commentId);
+        await db.deleteComment(commentId);
       } catch (e) {
         console.error('Failed to delete comment:', e);
       }
@@ -2591,8 +2668,7 @@ const App: React.FC = () => {
   const leaveGroup = async (groupId: string) => {
     if (!profileId) return;
     try {
-      const dbModule = await db;
-      await dbModule.leaveGroup(groupId, profileId);
+      await db.leaveGroup(groupId, profileId);
     } catch (e) {
       console.error('Failed to leave group:', e);
     }
@@ -2637,9 +2713,8 @@ const App: React.FC = () => {
   const addTeam = async () => {
     if (!userGroupId) return;
     try {
-      const dbModule = await db;
       const newTeamCount = teams.filter((t: any) => t.groupId === userGroupId).length + 1;
-      const team = await dbModule.createTeam(userGroupId, `새 팀 ${newTeamCount}`);
+      const team = await db.createTeam(userGroupId, `새 팀 ${newTeamCount}`);
       setTeams((prev: any) => [...prev, { id: team.id, groupId: userGroupId, name: team.name, members: [] }]);
     } catch (e) {
       console.error('Failed to add team:', e);
@@ -2649,8 +2724,7 @@ const App: React.FC = () => {
   const renameTeam = async (teamId: string, newName: string) => {
     setTeams((prev: any) => prev.map((t: any) => t.id === teamId ? { ...t, name: newName } : t));
     try {
-      const dbModule = await db;
-      await dbModule.renameTeam(teamId, newName);
+      await db.renameTeam(teamId, newName);
     } catch (e) {
       console.error('Failed to rename team:', e);
     }
@@ -2660,8 +2734,7 @@ const App: React.FC = () => {
     if (window.confirm('팀을 삭제하시겠습니까?')) {
       setTeams((prev: any) => prev.filter((t: any) => t.id !== teamId));
       try {
-        const dbModule = await db;
-        await dbModule.deleteTeam(teamId);
+        await db.deleteTeam(teamId);
       } catch (e) {
         console.error('Failed to delete team:', e);
       }
@@ -2672,9 +2745,8 @@ const App: React.FC = () => {
     if (!memberName.trim()) return;
     setTeams((prev: any) => prev.map((t: any) => t.id === teamId ? { ...t, members: [...t.members, memberName.trim()] } : t));
     try {
-      const dbModule = await db;
-      const profile = await dbModule.getProfileByNickname(memberName.trim());
-      if (profile) await dbModule.addTeamMember(teamId, profile.id);
+      const profile = await db.getProfileByNickname(memberName.trim());
+      if (profile) await db.addTeamMember(teamId, profile.id);
     } catch (e) {
       console.error('Failed to add member:', e);
     }
@@ -2683,9 +2755,8 @@ const App: React.FC = () => {
   const removeMember = async (teamId: string, memberName: string) => {
     setTeams((prev: any) => prev.map((t: any) => t.id === teamId ? { ...t, members: t.members.filter((m: any) => m !== memberName) } : t));
     try {
-      const dbModule = await db;
-      const profile = await dbModule.getProfileByNickname(memberName);
-      if (profile) await dbModule.removeTeamMember(teamId, profile.id);
+      const profile = await db.getProfileByNickname(memberName);
+      if (profile) await db.removeTeamMember(teamId, profile.id);
     } catch (e) {
       console.error('Failed to remove member:', e);
     }
@@ -2704,10 +2775,9 @@ const App: React.FC = () => {
         setActiveTab('home');
       }
       try {
-        const dbModule = await db;
         if (userGroupId) {
-          const profile = await dbModule.getProfileByNickname(name);
-          if (profile) await dbModule.kickMemberFromGroup(userGroupId, profile.id);
+          const profile = await db.getProfileByNickname(name);
+          if (profile) await db.kickMemberFromGroup(userGroupId, profile.id);
         }
       } catch (e) {
         console.error('Failed to kick member:', e);
@@ -2726,8 +2796,7 @@ const App: React.FC = () => {
     setViewMode('individual');
     setActiveTab('home');
     try {
-      const dbModule = await db;
-      await dbModule.deleteGroup(id);
+      await db.deleteGroup(id);
     } catch (e) {
       console.error('Failed to delete group:', e);
     }
@@ -2738,8 +2807,7 @@ const App: React.FC = () => {
   // ============================================
   const handleLoginSubmit = async (name: string, pass: string) => {
     try {
-      const dbModule = await db;
-      const user = await dbModule.loginUser(name, pass);
+      const user = await db.loginUser(name, pass);
       if (user) {
         const info = {
           name: user.nickname,
@@ -2766,8 +2834,7 @@ const App: React.FC = () => {
 
   const handleSignupSubmit = async (data: any) => {
     try {
-      const dbModule = await db;
-      const user = await dbModule.signupUser(data.name, data.password);
+      const user = await db.signupUser(data.name, data.password);
       const info = {
         name: user.nickname,
         profilePic: null,
@@ -2788,7 +2855,7 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
-    if (!userInfo.name) return <AuthView onLogin={handleLoginSubmit} onSignup={handleSignupSubmit} allUserNames={allUsers.map(u => u.name)} />;
+    if (!userInfo.name) return <AuthView onLogin={handleLoginSubmit} onSignup={handleSignupSubmit} allUserNames={allUserNames} />;
 
     if (showOnboarding) return <OnboardingView onCreate={handleCreateGroup} onJoin={handleJoinGroup} onBack={() => { setShowOnboarding(false); if (myGroupIds.length > 0) setShowGroupSelector(true); }} allGroupNames={groups.map(g => g.name)} />;
 
@@ -2836,7 +2903,7 @@ const App: React.FC = () => {
           />
         );
 
-      case 'ranking': return <RankingView currentGroupId={isGroupCtx ? userGroupId : null} userInfo={userInfo} teams={teams} missions={missions} />;
+      case 'ranking': return <RankingView currentGroupId={isGroupCtx ? userGroupId : null} userInfo={userInfo} teams={teams} missions={missions} groups={groups} myGroupIds={myGroupIds} />;
       case 'profile': return (
         <ProfileView
           team={isGroupCtx ? currentTeam || null : null}
@@ -2895,18 +2962,27 @@ const App: React.FC = () => {
 
   return (
     <div className="app-wrapper">
-      {!isInputView && !showOnboarding && userInfo.name && (
+      {loading && (
+        <div className="loading-overlay">
+          <Zap size={64} fill="var(--fit-green)" color="var(--fit-green)" strokeWidth={0} className="loading-icon" />
+          <p className="loading-text">데이터를 불러오는 중...</p>
+        </div>
+      )}
+
+      {!isInputView && !showOnboarding && userInfo.name && !loading && (
         <header className="main-header">
           <h2 className="header-title">TT Challenge</h2>
           <button className="group-header-btn" onClick={handleGroupBtnClick}>{viewMode === 'group' ? 'INDIVIDUAL' : 'GROUP'}</button>
         </header>
       )}
       <AnimatePresence mode="wait">
-        <motion.div key={isInputView ? 'input' : showOnboarding ? 'onboarding' : showGroupSelector ? 'selector' : (activeTab + (viewWeek ? `-week-${viewWeek}` : ''))} initial={{ opacity: 0, x: isInputView ? 50 : 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: isInputView ? -50 : -20 }} transition={{ duration: 0.3 }} className="content-area">
-          {renderContent()}
-        </motion.div>
+        {!loading && (
+          <motion.div key={isInputView ? 'input' : showOnboarding ? 'onboarding' : showGroupSelector ? 'selector' : (activeTab + (viewWeek ? `-week-${viewWeek}` : ''))} initial={{ opacity: 0, x: isInputView ? 50 : 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: isInputView ? -50 : -20 }} transition={{ duration: 0.3 }} className="content-area">
+            {renderContent()}
+          </motion.div>
+        )}
       </AnimatePresence>
-      {!isInputView && !showOnboarding && userInfo.name && (
+      {!isInputView && !showOnboarding && userInfo.name && !loading && (
         <nav className="bottom-nav">
           <div className={`nav-item ${activeTab === 'home' ? 'active' : ''}`} onClick={() => setActiveTab('home')}><Home size={22} /><span>홈</span></div>
           {viewMode === 'group' && (
