@@ -1425,7 +1425,7 @@ const ChallengeView = ({
       </div>
 
       <div className="flex flex-col gap-12 px-16">
-        {challenges.sort((a, b) => a.week - b.week).map((c, i) => (
+        {challenges.sort((a, b) => a.week - b.week).map((c) => (
           <motion.div
             layout
             key={c.id}
