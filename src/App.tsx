@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Home, Trophy, Calendar, Settings, ChevronLeft, Camera, Check, Plus, ArrowRight, Activity, Zap, Share2, UserPlus, Shield, User, Trash2, Edit2, X, MoreVertical, Heart, MessageCircle, MessageSquare } from 'lucide-react';
+import { Home, Trophy, Calendar, Settings, ChevronLeft, Camera, Check, Plus, ArrowRight, Activity, Zap, Share2, UserPlus, Shield, User, Trash, Edit2, X, MoreVertical, Heart, MessageCircle, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './App.css';
 
@@ -135,13 +135,11 @@ const OnboardingView = ({ onCreate, onJoin, onBack, allGroupNames }: { onCreate:
 const GroupSelectorView = ({
   myGroups,
   onSelect,
-  onLeave,
   onAddNew,
   onBack
 }: {
   myGroups: Group[],
   onSelect: (id: string) => void,
-  onLeave: (id: string) => void,
   onAddNew: () => void,
   onBack: () => void
 }) => {
@@ -159,17 +157,6 @@ const GroupSelectorView = ({
               <h3 className="text-white text-18 bold">{g.name}</h3>
               <p className="text-green font-12 mt-4 bold uppercase tracking-wider">전환하기</p>
             </div>
-            <button
-              className="p-8 text-gray-700 hover:text-red transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (window.confirm(`${g.name} 그룹에서 탈퇴하시겠습니까?`)) {
-                  onLeave(g.id);
-                }
-              }}
-            >
-              <Trash2 size={20} />
-            </button>
           </div>
         ))}
       </div>
@@ -771,7 +758,25 @@ const PBInputItem = ({ label, id, value, onChange }: { label: string, id: string
 );
 
 
-const ProfileView = ({ team, missions, userInfo, onUpdate, onEditMission, onLogout }: { team: Team | null, missions: Mission[], userInfo: any, onUpdate: (n: string, s: string, p: string | null, d: string, pbs: any, goal?: string) => void, onEditMission: (m: Mission) => void, onLogout: () => void }) => {
+const ProfileView = ({
+  team,
+  missions,
+  userInfo,
+  onUpdate,
+  onEditMission,
+  onLogout,
+  onLeaveGroup,
+  currentGroupName
+}: {
+  team: Team | null,
+  missions: Mission[],
+  userInfo: any,
+  onUpdate: (n: string, s: string, p: string | null, d: string, pbs: any, goal?: string) => void,
+  onEditMission: (m: Mission) => void,
+  onLogout: () => void,
+  onLeaveGroup?: () => void,
+  currentGroupName?: string
+}) => {
 
 
   const [isEditing, setIsEditing] = useState(false);
@@ -1073,7 +1078,17 @@ const ProfileView = ({ team, missions, userInfo, onUpdate, onEditMission, onLogo
         </div>
 
 
-        <div className="px-20 mt-40">
+        <div className="px-20 mt-12 flex flex-col gap-10">
+          {onLeaveGroup && (
+            <button className="btn-dark-lg py-16 text-red-dim" onClick={() => {
+              if (window.confirm(`${currentGroupName} 그룹에서 정말 탈퇴하시겠습니까?`)) {
+                onLeaveGroup();
+              }
+            }}>
+              <Trash size={18} /> 그룹 탈퇴하기
+            </button>
+          )}
+
           <button className="btn-logout-premium" onClick={() => {
             if (window.confirm('로그아웃 하시겠습니까?')) {
               onLogout();
@@ -1460,7 +1475,7 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
         </div>
         {(isAdmin || isAuthor) && (
           <button className="icon-btn-fit-subtle opacity-60 hover:opacity-100" onClick={() => onDeleteMission?.(mission.id)}>
-            <Trash2 size={16} className="text-red-dim" />
+            <Trash size={16} className="text-red-dim" />
           </button>
         )}
       </div>
@@ -1502,7 +1517,7 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
                     className="btn-delete-subtle opacity-0 group-hover:opacity-100"
                     onClick={() => onDeleteComment?.(mission.id, c.id)}
                   >
-                    <Trash2 size={12} />
+                    <Trash size={12} />
                   </button>
                 )}
 
@@ -1687,7 +1702,7 @@ const ChallengeView = ({
                           placeholder="항목 이름을 입력하세요"
                         />
                         <button className="btn-delete-subtle" onClick={() => removeField(idx)}>
-                          <Trash2 size={16} />
+                          <Trash size={16} />
                         </button>
                       </div>
 
@@ -1729,7 +1744,7 @@ const ChallengeView = ({
                             </button>
                             <div className="dropdown-divider-fit" />
                             <button className="dropdown-item-fit text-red" onClick={() => { onDelete(c.id); setShowMenu(null); }}>
-                              <Trash2 size={14} /> 삭제
+                              <Trash size={14} /> 삭제
                             </button>
                           </div>
                         )}
@@ -1925,7 +1940,7 @@ const LeaderView = ({
                         </button>
                         <div className="dropdown-divider-fit" />
                         <button className="dropdown-item-fit text-red" onClick={() => { deleteTeam(t.id); setShowTeamMenu(null); }}>
-                          <Trash2 size={14} /> 팀 삭제
+                          <Trash size={14} /> 팀 삭제
                         </button>
                       </div>
                     )}
@@ -2081,7 +2096,7 @@ const LeaderView = ({
                     setShowSettingsMenu(false);
                   }}
                 >
-                  <Trash2 size={16} /> 그룹 삭제
+                  <Trash size={16} /> 그룹 삭제
                 </button>
               </motion.div>
             )}
@@ -2507,7 +2522,6 @@ const App: React.FC = () => {
       <GroupSelectorView
         myGroups={groups.filter(g => myGroupIds.includes(g.id))}
         onSelect={switchGroup}
-        onLeave={leaveGroup}
         onAddNew={() => { setShowGroupSelector(false); setShowOnboarding(true); }}
         onBack={() => setShowGroupSelector(false)}
       />
@@ -2556,6 +2570,8 @@ const App: React.FC = () => {
           userInfo={userInfo}
           onUpdate={handleUpdateProfile}
           onEditMission={(m) => { setEditingMission(m); setIsInputView(true); }}
+          onLeaveGroup={isGroupCtx ? () => leaveGroup(userGroupId as string) : undefined}
+          currentGroupName={isGroupCtx ? (currentGroup?.name || '') : undefined}
           onLogout={() => {
             setUserInfo({
               name: '',

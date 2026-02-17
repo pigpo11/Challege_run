@@ -3014,3 +3014,24 @@ input[type=number] {
   transform: scale(0.98);
   background: #2c2c2e;
 }
+
+/* Global Button and UI Unity */
+button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.btn-delete-subtle {
+  background: transparent;
+  color: #ff453a;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  padding: 4px;
+}
+
+.btn-delete-subtle:hover {
+  opacity: 1;
+}
