@@ -51,9 +51,10 @@ type WeeklyChallenge = {
   recordFields?: { id: string; label: string; placeholder: string; unit: string }[];
 };
 
-const OnboardingView = ({ onCreate, onJoin, onBack }: { onCreate: (n: string) => void, onJoin: (c: string) => void, onBack: () => void }) => {
+const OnboardingView = ({ onCreate, onJoin, onBack, allGroupNames }: { onCreate: (n: string) => void, onJoin: (c: string) => void, onBack: () => void, allGroupNames: string[] }) => {
   const [mode, setMode] = useState<'choice' | 'create' | 'join'>('choice');
   const [value, setValue] = useState('');
+  const [error, setError] = useState('');
 
   return (
     <div className="page-container flex flex-col justify-center h-full px-24 bg-black">
@@ -93,9 +94,17 @@ const OnboardingView = ({ onCreate, onJoin, onBack }: { onCreate: (n: string) =>
                 autoFocus
               />
               <div className="flex gap-16 mt-24">
-                <button className="btn-dark-lg flex-1" onClick={() => { setMode('choice'); setValue(''); }}>뒤로가기</button>
-                <button className="btn-primary-lg flex-1" onClick={() => onCreate(value)}>그룹 생성</button>
+                <button className="btn-dark-lg flex-1" onClick={() => { setMode('choice'); setValue(''); setError(''); }}>뒤로가기</button>
+                <button className="btn-primary-lg flex-1" onClick={() => {
+                  if (allGroupNames.includes(value.trim())) {
+                    setError('중복되는 그룹명입니다.');
+                    return;
+                  }
+                  setError('');
+                  onCreate(value);
+                }}>그룹 생성</button>
               </div>
+              {error && <p className="error-msg-premium text-center">{error}</p>}
             </div>
           </motion.div>
         )}
@@ -113,7 +122,7 @@ const OnboardingView = ({ onCreate, onJoin, onBack }: { onCreate: (n: string) =>
                 autoFocus
               />
               <div className="flex gap-16 mt-24">
-                <button className="btn-dark-lg flex-1" onClick={() => { setMode('choice'); setValue(''); }}>뒤로가기</button>
+                <button className="btn-dark-lg flex-1" onClick={() => { setMode('choice'); setValue(''); setError(''); }}>뒤로가기</button>
                 <button className="btn-primary-lg flex-1" onClick={() => onJoin(value.toUpperCase())}>그룹 참가</button>
               </div>
             </div>
@@ -2329,7 +2338,7 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     if (!userInfo.name) return <AuthView onLogin={handleLoginSubmit} onSignup={handleSignupSubmit} allUserNames={allUsers.map(u => u.name)} />;
-    if (showOnboarding) return <OnboardingView onCreate={handleCreateGroup} onJoin={handleJoinGroup} onBack={() => setShowOnboarding(false)} />;
+    if (showOnboarding) return <OnboardingView onCreate={handleCreateGroup} onJoin={handleJoinGroup} onBack={() => setShowOnboarding(false)} allGroupNames={groups.map(g => g.name)} />;
     if (isInputView) return <MissionInputView onBack={() => setIsInputView(false)} onSubmit={submitMission} isGroup={viewMode === 'group'} challenge={challenges.find(c => c.week === currentPeriod)} />;
 
     const isGroupCtx = viewMode === 'group' && userGroupId;
