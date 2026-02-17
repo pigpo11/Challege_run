@@ -176,7 +176,7 @@ const GroupSelectorView = ({
 };
 
 
-const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string, pass: string) => boolean, onSignup: (data: any) => void, allUserNames: string[] }) => {
+const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string, pass: string) => boolean | Promise<boolean>, onSignup: (data: any) => void, allUserNames: string[] }) => {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [signupStep, setSignupStep] = useState(1);
 
@@ -193,8 +193,9 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
   const [signupError, setSignupError] = useState('');
   const pinInputRef = useRef<HTMLInputElement>(null);
 
-  const handleLogin = () => {
-    if (!onLogin(loginName, loginPass)) {
+  const handleLogin = async () => {
+    const result = await onLogin(loginName, loginPass);
+    if (!result) {
       setLoginError('아이디 또는 비밀번호가 일치하지 않습니다.');
     }
   };
@@ -2145,174 +2146,293 @@ const LeaderView = ({
   );
 };
 const App: React.FC = () => {
+  // --- Import database functions ---
+  const db = React.useMemo(() => import('./lib/database'), []);
 
   const [activeTab, setActiveTab] = useState('home');
   const [viewWeek, setViewWeek] = useState<number | null>(null);
-  const [userRole, setUserRole] = useState<'user' | 'leader'>(() => (localStorage.getItem('userRole') as any) || 'user');
-  const [userGroupId, setUserGroupId] = useState<string | null>(() => localStorage.getItem('userGroupId'));
-  const [userTeamId, setUserTeamId] = useState<string | null>(() => localStorage.getItem('userTeamId'));
-  const [viewMode, setViewMode] = useState<'individual' | 'group'>(() => (localStorage.getItem('viewMode') as any) || 'individual');
+  const [userRole, setUserRole] = useState<'user' | 'leader'>('user');
+  const [userGroupId, setUserGroupId] = useState<string | null>(null);
+  const [userTeamId, setUserTeamId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'individual' | 'group'>('individual');
   const [isInputView, setIsInputView] = useState(false);
   const [editingMission, setEditingMission] = useState<Mission | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showGroupSelector, setShowGroupSelector] = useState(false);
-  const [myGroupIds, setMyGroupIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('myGroupIds');
-    if (saved) return JSON.parse(saved);
-    const oldId = localStorage.getItem('userGroupId');
-    return oldId ? [oldId] : [];
+  const [loading, setLoading] = useState(true);
+
+  // Profile state - includes supabase profile ID
+  const [profileId, setProfileId] = useState<string | null>(() => localStorage.getItem('profileId'));
+  const [myGroupIds, setMyGroupIds] = useState<string[]>([]);
+  const [allUsers] = useState<any[]>([]);
+  const [userInfo, setUserInfo] = useState({
+    name: '',
+    profilePic: null as string | null,
+    statusMessage: '러닝 열정 폭발 🔥',
+    monthlyDistance: '0',
+    lastUpdatedMonth: new Date().getMonth() + 1,
+    pbs: { '1KM': "00'00\"", '3KM': "00'00\"", '5KM': "00'00\"", '10KM': "00'00\"" },
+    monthlyGoal: '100'
   });
 
-  const [allUsers, setAllUsers] = useState<any[]>(() => {
-    const saved = localStorage.getItem('allUsers');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [currentPeriod, setCurrentPeriod] = useState(1);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [groupMembers, setGroupMembers] = useState<string[]>([]);
+  const [challenges, setChallenges] = useState<WeeklyChallenge[]>([]);
 
-  const [userInfo, setUserInfo] = useState(() => {
-    const saved = localStorage.getItem('userInfo');
-    return saved ? JSON.parse(saved) : {
-      name: '',
-      profilePic: null as string | null,
-      statusMessage: '러닝 열정 폭발 🔥',
-      monthlyDistance: '0',
-      lastUpdatedMonth: new Date().getMonth() + 1,
-      pbs: {
-        '1KM': "00'00\"",
-        '3KM': "00'00\"",
-        '5KM': "00'00\"",
-        '10KM': "00'00\""
-      },
-      monthlyGoal: '100'
-    };
-  });
+  // ============================================
+  // Load data from Supabase on mount / login
+  // ============================================
+  const loadUserData = React.useCallback(async (pId: string, nickname: string) => {
+    const dbModule = await db;
+    try {
+      // Load my groups
+      const myGroups = await dbModule.getMyGroups(pId);
+      const groupList: Group[] = myGroups.map((g: any) => ({
+        id: g.id,
+        name: g.name,
+        leaderId: g.leader_id,
+        inviteCode: g.invite_code,
+        totalScore: g.total_score || 0,
+        totalDistance: Number(g.total_distance) || 0
+      }));
+      setGroups(groupList);
+      setMyGroupIds(groupList.map(g => g.id));
 
-  const [currentPeriod, setCurrentPeriod] = useState(() => {
-    const saved = localStorage.getItem('currentPeriod');
-    return saved ? parseInt(saved) : 1;
-  });
+      // Load challenges
+      const challengeList = await dbModule.getChallenges();
+      setChallenges(challengeList);
 
-  const [groups, setGroups] = useState<Group[]>(() => {
-    const saved = localStorage.getItem('groups');
-    return saved ? JSON.parse(saved) : [];
-  });
+      // If user has groups, load first group's data
+      if (groupList.length > 0) {
+        const firstGroup = groupList[0];
+        const role = myGroups[0]?.myRole === 'leader' ? 'leader' : 'user';
+        setUserGroupId(firstGroup.id);
+        setUserRole(role as 'user' | 'leader');
+        setViewMode('group');
 
-  const [teams, setTeams] = useState<Team[]>(() => {
-    const saved = localStorage.getItem('teams');
-    return saved ? JSON.parse(saved) : [];
-  });
+        // Load teams for this group
+        const teamList = await dbModule.getTeamsByGroup(firstGroup.id);
+        setTeams(teamList);
 
-  const [missions, setMissions] = useState<Mission[]>(() => {
-    const saved = localStorage.getItem('missions');
-    return saved ? JSON.parse(saved) : [];
-  });
+        // Find my team
+        const myTeam = teamList.find((t: any) => t.members.includes(nickname));
+        setUserTeamId(myTeam ? myTeam.id : null);
 
-  const [groupMembers, setGroupMembers] = useState<string[]>(() => {
-    const saved = localStorage.getItem('groupMembers');
-    return saved ? JSON.parse(saved) : [];
-  });
+        // Load group members
+        const members = await dbModule.getGroupMembers(firstGroup.id);
+        setGroupMembers(members.map((m: any) => m.nickname));
 
-  const defaultChallenges: WeeklyChallenge[] = [
-    { id: 'c1', week: 1, title: '베이스라인 설정', description: '1/3/5km 개인 TT 측정 및 목표 설정', recordFields: [{ id: '1KM', label: '1KM', placeholder: '00:00', unit: '' }, { id: '3KM', label: '3KM', placeholder: '00:00', unit: '' }, { id: '5KM', label: '5KM', placeholder: '00:00', unit: '' }] },
-    { id: 'c2', week: 2, title: '심폐 & 파워 강화', description: '트레드밀 업힐 인터벌 및 러닝 파워 집중', recordFields: [{ id: 'power', label: '파워', placeholder: '250W', unit: 'W' }, { id: 'hr', label: '심박', placeholder: '165bpm', unit: 'bpm' }] },
-    { id: 'c3', week: 3, title: '스피드 개발', description: '스프린트 훈련을 통한 최고속도 향상', recordFields: [{ id: 'sprint', label: '100m', placeholder: '15s', unit: 's' }] },
-    { id: 'c4', week: 4, title: '팀 실전 테스트', description: '팀 5km 릴레이 TT 및 실전 점검', recordFields: [{ id: 'relay', label: '5KM', placeholder: '20:00', unit: '' }] },
-    { id: 'c5', week: 5, title: '디로드 & 회복', description: '저강도 러닝 및 리커버리 세션', recordFields: [{ id: 'recovery', label: '회복', placeholder: '느낌', unit: '' }] },
-    { id: 'c6', week: 6, title: '레이스 준비', description: '영양 관리 및 최상의 컨디션 조절', recordFields: [] },
-  ];
+        // Load missions for this group
+        const missionList = await dbModule.getMissionsByGroup(firstGroup.id);
+        setMissions(missionList);
+      } else {
+        // Load individual missions
+        const missionList = await dbModule.getIndividualMissions(pId);
+        setMissions(missionList);
+      }
+    } catch (e) {
+      console.error('Failed to load user data:', e);
+    }
+    setLoading(false);
+  }, [db]);
 
-  const [challenges, setChallenges] = useState<WeeklyChallenge[]>(() => {
-    const saved = localStorage.getItem('challenges');
-    return saved ? JSON.parse(saved) : defaultChallenges;
-  });
-
-  // Sync state to localStorage
+  // On mount: check if user was previously logged in
   useEffect(() => {
-    localStorage.setItem('userInfo', JSON.stringify(userInfo));
-    localStorage.setItem('allUsers', JSON.stringify(allUsers));
-    localStorage.setItem('groups', JSON.stringify(groups));
-    localStorage.setItem('teams', JSON.stringify(teams));
-    localStorage.setItem('missions', JSON.stringify(missions));
-    localStorage.setItem('groupMembers', JSON.stringify(groupMembers));
-    localStorage.setItem('challenges', JSON.stringify(challenges));
-    localStorage.setItem('currentPeriod', String(currentPeriod));
-    if (userGroupId) localStorage.setItem('userGroupId', userGroupId);
-    else localStorage.removeItem('userGroupId');
-    if (userTeamId) localStorage.setItem('userTeamId', userTeamId);
-    else localStorage.removeItem('userTeamId');
-    localStorage.setItem('userRole', userRole);
-    localStorage.setItem('viewMode', viewMode);
-    localStorage.setItem('myGroupIds', JSON.stringify(myGroupIds));
-  }, [userInfo, allUsers, groups, teams, missions, groupMembers, userGroupId, userTeamId, userRole, viewMode, myGroupIds, challenges, currentPeriod]);
+    const savedProfileId = localStorage.getItem('profileId');
+    const savedUserInfo = localStorage.getItem('userInfo');
+    if (savedProfileId && savedUserInfo) {
+      const info = JSON.parse(savedUserInfo);
+      if (info.name) {
+        setProfileId(savedProfileId);
+        setUserInfo(info);
+        loadUserData(savedProfileId, info.name);
+        return;
+      }
+    }
+    setLoading(false);
+  }, [loadUserData]);
 
-  const addChallenge = () => {
+  // Reload group data when switching groups
+  const loadGroupData = React.useCallback(async (groupId: string) => {
+    const dbModule = await db;
+    try {
+      const teamList = await dbModule.getTeamsByGroup(groupId);
+      setTeams(teamList);
+
+      const members = await dbModule.getGroupMembers(groupId);
+      setGroupMembers(members.map((m: any) => m.nickname));
+
+      const missionList = await dbModule.getMissionsByGroup(groupId);
+      setMissions(missionList);
+    } catch (e) {
+      console.error('Failed to load group data:', e);
+    }
+  }, [db]);
+
+  // ============================================
+  // Challenges (Supabase-backed)
+  // ============================================
+  const addChallenge = async () => {
     const nextWeek = challenges.length > 0 ? Math.max(...challenges.map((c: any) => c.week)) + 1 : 1;
-    const newChallenge: WeeklyChallenge = {
-      id: `c${Date.now()}`,
-      week: nextWeek,
-      title: '새로운 훈련',
-      description: '훈련 내용을 입력해주세요.'
-    };
-    setChallenges((prev: any) => [...prev, newChallenge]);
-  };
-
-  const updateChallenge = (id: string, title: string, desc: string, fields?: any[]) => {
-    setChallenges((prev: any) => prev.map((c: any) => c.id === id ? { ...c, title, description: desc, recordFields: fields || c.recordFields } : c));
-  };
-
-  const deleteChallenge = (id: string) => {
-    if (window.confirm('이 주차의 챌린지를 삭제하시겠습니까?')) {
-      setChallenges((prev: any) => prev.filter((c: any) => c.id !== id));
+    try {
+      const dbModule = await db;
+      const created = await dbModule.addChallengeDB(nextWeek, '새로운 훈련', '훈련 내용을 입력해주세요.');
+      setChallenges(prev => [...prev, { id: created.id, week: created.week, title: created.title, description: created.description, recordFields: created.record_fields || [] }]);
+    } catch (e) {
+      console.error('Failed to add challenge:', e);
     }
   };
 
-  const handleCreateGroup = (name: string) => {
-    const newGroupId = `g${Date.now()}`;
-    const newInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setGroups((prev: any) => [...prev, { id: newGroupId, name, leaderId: 'me', inviteCode: newInviteCode, totalScore: 0, totalDistance: 0 }]);
-    setMyGroupIds(prev => [...prev, newGroupId]);
-    setUserGroupId(newGroupId);
-    setUserRole('leader');
-    const newTeamId = `t${Date.now()}`;
-    setTeams((prev: any) => [...prev, { id: newTeamId, groupId: newGroupId, name: `${name} 01팀`, members: [userInfo.name] }]);
-    setUserTeamId(newTeamId);
-    setShowOnboarding(false);
-    setShowGroupSelector(false);
-    setViewMode('group');
-    setActiveTab('leader');
+  const updateChallenge = async (id: string, title: string, desc: string, fields?: any[]) => {
+    try {
+      const dbModule = await db;
+      await dbModule.updateChallengeDB(id, title, desc, fields);
+      setChallenges((prev: any) => prev.map((c: any) => c.id === id ? { ...c, title, description: desc, recordFields: fields || c.recordFields } : c));
+    } catch (e) {
+      console.error('Failed to update challenge:', e);
+    }
   };
 
-  const handleJoinGroup = (code: string) => {
-    const group = groups.find(g => g.inviteCode === code);
-    if (group) {
+  const deleteChallenge = async (id: string) => {
+    if (window.confirm('이 주차의 챌린지를 삭제하시겠습니까?')) {
+      try {
+        const dbModule = await db;
+        await dbModule.deleteChallengeDB(id);
+        setChallenges((prev: any) => prev.filter((c: any) => c.id !== id));
+      } catch (e) {
+        console.error('Failed to delete challenge:', e);
+      }
+    }
+  };
+
+  // ============================================
+  // Groups (Supabase-backed)
+  // ============================================
+  const handleCreateGroup = async (name: string) => {
+    if (!profileId) return;
+    const newInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    try {
+      const dbModule = await db;
+      const group = await dbModule.createGroup(name, profileId, newInviteCode);
+
+      // Create default team
+      const team = await dbModule.createTeam(group.id, `${name} 01팀`);
+      await dbModule.addTeamMember(team.id, profileId);
+
+      const newGroup: Group = {
+        id: group.id,
+        name: group.name,
+        leaderId: group.leader_id,
+        inviteCode: group.invite_code,
+        totalScore: 0,
+        totalDistance: 0
+      };
+
+      setGroups(prev => [...prev, newGroup]);
+      setMyGroupIds(prev => [...prev, group.id]);
+      setUserGroupId(group.id);
+      setUserRole('leader');
+      setTeams(prev => [...prev, { id: team.id, groupId: group.id, name: `${name} 01팀`, members: [userInfo.name] }]);
+      setUserTeamId(team.id);
+      setGroupMembers([userInfo.name]);
+      setShowOnboarding(false);
+      setShowGroupSelector(false);
+      setViewMode('group');
+      setActiveTab('leader');
+    } catch (e: any) {
+      alert('그룹 생성 실패: ' + (e.message || ''));
+    }
+  };
+
+  const handleJoinGroup = async (code: string) => {
+    if (!profileId) return;
+    try {
+      const dbModule = await db;
+      const group = await dbModule.getGroupByInviteCode(code);
+      if (!group) {
+        alert('유효하지 않은 초대코드입니다.');
+        return;
+      }
       if (myGroupIds.includes(group.id)) {
         alert('이미 참여 중인 그룹입니다.');
         return;
       }
+
+      await dbModule.joinGroup(group.id, profileId);
+
+      // Add to first team
+      const teamList = await dbModule.getTeamsByGroup(group.id);
+      if (teamList.length > 0) {
+        await dbModule.addTeamMember(teamList[0].id, profileId);
+      }
+
+      const newGroup: Group = {
+        id: group.id,
+        name: group.name,
+        leaderId: group.leader_id,
+        inviteCode: group.invite_code,
+        totalScore: group.total_score || 0,
+        totalDistance: Number(group.total_distance) || 0
+      };
+
+      setGroups(prev => [...prev, newGroup]);
       setMyGroupIds(prev => [...prev, group.id]);
       setUserGroupId(group.id);
       setUserRole('user');
-      // 그룹 멤버 목록에 추가
-      setGroupMembers(prev => prev.includes(userInfo.name) ? prev : [...prev, userInfo.name]);
-      const groupTeams = teams.filter((t: any) => t.groupId === group.id);
-      if (groupTeams.length > 0) {
-        const targetTeamId = groupTeams[0].id;
-        setUserTeamId(targetTeamId);
-        setTeams((prev: any) => prev.map((t: any) => t.id === targetTeamId ? { ...t, members: t.members.includes(userInfo.name) ? t.members : [...t.members, userInfo.name] } : t));
-      }
+
+      // Reload group data
+      await loadGroupData(group.id);
+
       setShowOnboarding(false);
       setShowGroupSelector(false);
       setViewMode('group');
       setActiveTab('home');
-    } else alert('유효하지 않은 초대코드입니다.');
+    } catch (e: any) {
+      alert('그룹 참여 실패: ' + (e.message || ''));
+    }
   };
 
-  const handleUpdateProfile = (name: string, status: string, pic: string | null, dist: string, pbs: any, goal?: string) => {
+  // ============================================
+  // Profile (Supabase-backed)
+  // ============================================
+  const handleUpdateProfile = async (name: string, status: string, pic: string | null, dist: string, pbs: any, goal?: string) => {
     setUserInfo((prev: any) => ({ ...prev, name, statusMessage: status, profilePic: pic, monthlyDistance: dist, pbs, monthlyGoal: goal || prev.monthlyGoal }));
+    if (profileId) {
+      try {
+        const dbModule = await db;
+        await dbModule.updateProfile(profileId, {
+          status_message: status,
+          profile_pic: pic,
+          monthly_distance: parseFloat(dist) || 0,
+          pbs,
+          monthly_goal: parseFloat(goal || '100')
+        });
+        localStorage.setItem('userInfo', JSON.stringify({ ...userInfo, name, statusMessage: status, profilePic: pic, monthlyDistance: dist, pbs, monthlyGoal: goal || userInfo.monthlyGoal }));
+      } catch (e) {
+        console.error('Failed to update profile:', e);
+      }
+    }
   };
 
-  const approveMission = (missionId: string) => setMissions((prev: any) => prev.map((m: any) => m.id === missionId ? { ...m, status: 'approved' } : m));
+  // ============================================
+  // Missions (Supabase-backed)
+  // ============================================
+  const approveMission = async (missionId: string) => {
+    setMissions((prev: any) => prev.map((m: any) => m.id === missionId ? { ...m, status: 'approved' } : m));
+    try {
+      const dbModule = await db;
+      await dbModule.approveMission(missionId);
+    } catch (e) {
+      console.error('Failed to approve mission:', e);
+    }
+  };
 
-  const submitMission = (records: any, photos: string[], distance: string) => {
+  const submitMissionHandler = async (records: any, photos: string[], distance: string) => {
+    if (!profileId) return;
+
     if (editingMission) {
       setMissions((prev: any) => prev.map((m: any) => m.id === editingMission.id ? {
         ...m,
@@ -2326,116 +2446,150 @@ const App: React.FC = () => {
     }
 
     const isIndividual = viewMode === 'individual';
-
-    const targetTeamId = (viewMode === 'group' && userTeamId) ? userTeamId : 'individual';
-    const targetGroupId = (viewMode === 'group' && userGroupId) ? userGroupId : 'none';
-
-    const currentMonth = new Date().getMonth() + 1;
     const addedDist = parseFloat(distance) || 0;
 
-    // 1. 개인 마일리지는 개인 화면에서 제출할 때만 OCR 거리만큼 추가됨
+    // Update individual mileage
     if (isIndividual) {
+      const currentMonth = new Date().getMonth() + 1;
       setUserInfo((prev: any) => {
         const isNewMonth = prev.lastUpdatedMonth !== currentMonth;
         const baseDist = isNewMonth ? 0 : parseFloat(prev.monthlyDistance);
-        return {
-          ...prev,
-          monthlyDistance: (baseDist + addedDist).toFixed(1),
-          lastUpdatedMonth: currentMonth
-        };
+        const updated = { ...prev, monthlyDistance: (baseDist + addedDist).toFixed(1), lastUpdatedMonth: currentMonth };
+        localStorage.setItem('userInfo', JSON.stringify(updated));
+        return updated;
       });
+      if (profileId) {
+        const dbModule = await db;
+        const currentMonth = new Date().getMonth() + 1;
+        const baseDist = userInfo.lastUpdatedMonth !== currentMonth ? 0 : parseFloat(userInfo.monthlyDistance);
+        await dbModule.updateProfile(profileId, { monthly_distance: baseDist + addedDist, last_updated_month: currentMonth });
+      }
     }
 
-    // 2. 그룹 활동은 그룹 인증일 때만 추가 (승인 전에도 누적할지 여부는 비즈니스 로직에 따름, 일단 기존 유지)
-    if (!isIndividual && userGroupId) {
-      setGroups((prev: any) => prev.map((g: any) => g.id === userGroupId ? { ...g, totalDistance: (g.totalDistance || 0) + addedDist } : g));
-    }
-
-    setMissions((prev: any) => {
-      // 주차별로 여러 번 인증이 가능하도록 필터링 로직 제거
-      const missionTypeTag = isIndividual ? '개인 러닝' : '챌린지 인증';
-
-      return [...prev, {
-        id: `m${Date.now()}`,
-        groupId: targetGroupId,
-        teamId: targetTeamId,
+    try {
+      const dbModule = await db;
+      const created = await dbModule.submitMission({
+        groupId: isIndividual ? null : userGroupId,
+        teamId: isIndividual ? null : userTeamId,
+        profileId,
         userName: userInfo.name,
         week: currentPeriod,
-        type: missionTypeTag, // 구분 명확화
-        status: isIndividual ? 'approved' : 'pending', // 개인은 즉시 승인, 그룹은 대기
-        timestamp: new Date().toLocaleString(),
+        type: isIndividual ? '개인 러닝' : '챌린지 인증',
+        status: isIndividual ? 'none' : 'pending',
         records,
         distance: addedDist,
-        images: photos,
+        images: photos
+      });
+
+      setMissions((prev: any) => [{
+        id: created.id,
+        groupId: created.group_id,
+        teamId: created.team_id,
+        profileId: created.profile_id,
+        userName: created.user_name,
+        week: created.week,
+        type: created.type,
+        status: created.status,
+        timestamp: created.created_at,
+        records: created.records || {},
+        distance: Number(created.distance) || 0,
+        images: created.images || [],
         likedBy: [],
         comments: []
-      }];
-    });
+      }, ...prev]);
+    } catch (e) {
+      console.error('Failed to submit mission:', e);
+    }
 
     setIsInputView(false);
   };
 
-
-  const likeMission = (id: string) => {
+  const likeMission = async (id: string) => {
     setMissions((prev: any) => prev.map((m: any) => {
       if (m.id !== id) return m;
       const isLiked = m.likedBy.includes(userInfo.name);
-      return {
-        ...m,
-        likedBy: isLiked
-          ? m.likedBy.filter((name: string) => name !== userInfo.name)
-          : [...m.likedBy, userInfo.name]
-      };
+      return { ...m, likedBy: isLiked ? m.likedBy.filter((n: string) => n !== userInfo.name) : [...m.likedBy, userInfo.name] };
     }));
+    try {
+      const dbModule = await db;
+      await dbModule.toggleLike(id, userInfo.name);
+    } catch (e) {
+      console.error('Failed to toggle like:', e);
+    }
   };
 
-  const addComment = (missionId: string, text: string) => {
-    const newComment: Comment = {
-      id: `comment-${Date.now()}`,
-      userName: userInfo.name,
-      text,
-      timestamp: '방금 전'
-    };
-    setMissions((prev: any) => prev.map((m: any) => m.id === missionId ? { ...m, comments: [...m.comments, newComment] } : m));
+  const addCommentHandler = async (missionId: string, text: string) => {
+    if (!profileId) return;
+    try {
+      const dbModule = await db;
+      const created = await dbModule.addComment(missionId, profileId, userInfo.name, text);
+      const newComment: Comment = { id: created.id, userName: created.user_name, text: created.text, timestamp: created.created_at };
+      setMissions((prev: any) => prev.map((m: any) => m.id === missionId ? { ...m, comments: [...m.comments, newComment] } : m));
+    } catch (e) {
+      console.error('Failed to add comment:', e);
+    }
   };
 
-  const deleteMission = (id: string) => {
+  const deleteMission = async (id: string) => {
     if (window.confirm('인증 게시물을 삭제하시겠습니까?')) {
       setMissions((prev: any) => prev.filter((m: any) => m.id !== id));
+      try {
+        const dbModule = await db;
+        await dbModule.deleteMission(id);
+      } catch (e) {
+        console.error('Failed to delete mission:', e);
+      }
     }
   };
 
-  const deleteComment = (missionId: string, commentId: string) => {
+  const deleteCommentHandler = async (missionId: string, commentId: string) => {
     if (window.confirm('댓글을 삭제하시겠습니까?')) {
       setMissions((prev: any) => prev.map((m: any) =>
-        m.id === missionId
-          ? { ...m, comments: m.comments.filter((c: any) => c.id !== commentId) }
-          : m
+        m.id === missionId ? { ...m, comments: m.comments.filter((c: any) => c.id !== commentId) } : m
       ));
+      try {
+        const dbModule = await db;
+        await dbModule.deleteComment(commentId);
+      } catch (e) {
+        console.error('Failed to delete comment:', e);
+      }
     }
   };
-
 
   const currentGroup = groups.find(g => g.id === userGroupId);
   const currentTeam = teams.find(t => t.id === userTeamId);
 
-  const switchGroup = (groupId: string) => {
+  // ============================================
+  // Group switching / leaving
+  // ============================================
+  const switchGroup = async (groupId: string) => {
     setUserGroupId(groupId);
     const group = groups.find(g => g.id === groupId);
     if (group) {
-      setUserRole(group.leaderId === 'me' ? 'leader' : 'user');
-      const myTeam = teams.find(t => t.groupId === groupId && t.members.includes(userInfo.name));
-      setUserTeamId(myTeam ? myTeam.id : null);
+      setUserRole(group.leaderId === profileId ? 'leader' : 'user');
     }
     setShowGroupSelector(false);
     setViewMode('group');
     setActiveTab('home');
+
+    // Reload group data from Supabase
+    await loadGroupData(groupId);
+    const myTeam = teams.find(t => t.groupId === groupId && t.members.includes(userInfo.name));
+    setUserTeamId(myTeam ? myTeam.id : null);
   };
 
-  const leaveGroup = (groupId: string) => {
+  const leaveGroup = async (groupId: string) => {
+    if (!profileId) return;
+    try {
+      const dbModule = await db;
+      await dbModule.leaveGroup(groupId, profileId);
+    } catch (e) {
+      console.error('Failed to leave group:', e);
+    }
+
     const updatedIds = myGroupIds.filter(id => id !== groupId);
     setMyGroupIds(updatedIds);
-    setTeams(prev => prev.map(t => t.groupId === groupId ? { ...t, members: t.members.filter(m => m !== userInfo.name) } : t));
+    setGroups(prev => prev.filter(g => g.id !== groupId || updatedIds.includes(g.id)));
 
     if (userGroupId === groupId) {
       if (updatedIds.length > 0) {
@@ -2467,39 +2621,70 @@ const App: React.FC = () => {
     }
   };
 
-  const addTeam = () => {
+  // ============================================
+  // Teams (Supabase-backed)
+  // ============================================
+  const addTeam = async () => {
     if (!userGroupId) return;
-    const newTeamId = `t${Date.now()}`;
-    const newTeamCount = teams.filter((t: any) => t.groupId === userGroupId).length + 1;
-    setTeams((prev: any) => [...prev, { id: newTeamId, groupId: userGroupId, name: `새 팀 ${newTeamCount}`, members: [] }]);
-  };
-
-  const renameTeam = (teamId: string, newName: string) => {
-    setTeams((prev: any) => prev.map((t: any) => t.id === teamId ? { ...t, name: newName } : t));
-  };
-
-  const deleteTeam = (teamId: string) => {
-    if (window.confirm('팀을 삭제하시겠습니까?')) {
-      setTeams((prev: any) => prev.filter((t: any) => t.id !== teamId));
+    try {
+      const dbModule = await db;
+      const newTeamCount = teams.filter((t: any) => t.groupId === userGroupId).length + 1;
+      const team = await dbModule.createTeam(userGroupId, `새 팀 ${newTeamCount}`);
+      setTeams((prev: any) => [...prev, { id: team.id, groupId: userGroupId, name: team.name, members: [] }]);
+    } catch (e) {
+      console.error('Failed to add team:', e);
     }
   };
 
-  const addMember = (teamId: string, memberName: string) => {
+  const renameTeam = async (teamId: string, newName: string) => {
+    setTeams((prev: any) => prev.map((t: any) => t.id === teamId ? { ...t, name: newName } : t));
+    try {
+      const dbModule = await db;
+      await dbModule.renameTeam(teamId, newName);
+    } catch (e) {
+      console.error('Failed to rename team:', e);
+    }
+  };
+
+  const deleteTeam = async (teamId: string) => {
+    if (window.confirm('팀을 삭제하시겠습니까?')) {
+      setTeams((prev: any) => prev.filter((t: any) => t.id !== teamId));
+      try {
+        const dbModule = await db;
+        await dbModule.deleteTeam(teamId);
+      } catch (e) {
+        console.error('Failed to delete team:', e);
+      }
+    }
+  };
+
+  const addMember = async (teamId: string, memberName: string) => {
     if (!memberName.trim()) return;
     setTeams((prev: any) => prev.map((t: any) => t.id === teamId ? { ...t, members: [...t.members, memberName.trim()] } : t));
+    try {
+      const dbModule = await db;
+      const profile = await dbModule.getProfileByNickname(memberName.trim());
+      if (profile) await dbModule.addTeamMember(teamId, profile.id);
+    } catch (e) {
+      console.error('Failed to add member:', e);
+    }
   };
 
-  const removeMember = (teamId: string, memberName: string) => {
+  const removeMember = async (teamId: string, memberName: string) => {
     setTeams((prev: any) => prev.map((t: any) => t.id === teamId ? { ...t, members: t.members.filter((m: any) => m !== memberName) } : t));
+    try {
+      const dbModule = await db;
+      const profile = await dbModule.getProfileByNickname(memberName);
+      if (profile) await dbModule.removeTeamMember(teamId, profile.id);
+    } catch (e) {
+      console.error('Failed to remove member:', e);
+    }
   };
 
-  const kickMember = (name: string) => {
+  const kickMember = async (name: string) => {
     if (window.confirm(`${name} 멤버를 내보내시겠습니까?`)) {
-      // 1. 그룹 멤버 목록에서 제거
       setGroupMembers((prev: any) => prev.filter((m: any) => m !== name));
-      // 2. 모든 팀에서 제거
       setTeams((prev: any) => prev.map((t: any) => ({ ...t, members: t.members.filter((m: any) => m !== name) })));
-      // 3. 강퇴 대상이 현재 로그인한 유저인 경우 그룹 연결 해제
       if (name === userInfo.name && userGroupId) {
         setMyGroupIds(prev => prev.filter(id => id !== userGroupId));
         setUserGroupId(null);
@@ -2508,10 +2693,19 @@ const App: React.FC = () => {
         setViewMode('individual');
         setActiveTab('home');
       }
+      try {
+        const dbModule = await db;
+        if (userGroupId) {
+          const profile = await dbModule.getProfileByNickname(name);
+          if (profile) await dbModule.kickMemberFromGroup(userGroupId, profile.id);
+        }
+      } catch (e) {
+        console.error('Failed to kick member:', e);
+      }
     }
   };
 
-  const deleteGroup = (id: string) => {
+  const deleteGroup = async (id: string) => {
     setGroups((prev: any) => prev.filter((g: any) => g.id !== id));
     setTeams((prev: any) => prev.filter((t: any) => t.groupId !== id));
     setMissions((prev: any) => prev.filter((m: any) => m.groupId !== id));
@@ -2521,31 +2715,66 @@ const App: React.FC = () => {
     setUserRole('user');
     setViewMode('individual');
     setActiveTab('home');
-  };
-
-  const handleLoginSubmit = (name: string, pass: string) => {
-    const user = allUsers.find(u => u.name === name && u.password === pass);
-    if (user) {
-      setUserInfo(user);
-      return true;
+    try {
+      const dbModule = await db;
+      await dbModule.deleteGroup(id);
+    } catch (e) {
+      console.error('Failed to delete group:', e);
     }
-    return false;
   };
 
-  const handleSignupSubmit = (data: any) => {
-    const newUser = {
-      name: data.name,
-      password: data.password,
-      profilePic: null,
-      statusMessage: '러닝 열정 폭발 🔥',
-      monthlyDistance: '0',
-      lastUpdatedMonth: new Date().getMonth() + 1,
-      pbs: { '1KM': "00'00\"", '3KM': "00'00\"", '5KM': "00'00\"", '10KM': "00'00\"" },
-      monthlyGoal: data.monthlyGoal
-    };
-    setAllUsers((prev: any[]) => [...prev, newUser]);
-    setGroupMembers((prev: string[]) => [...prev, newUser.name]);
-    setUserInfo(newUser);
+  // ============================================
+  // Auth (Supabase-backed)
+  // ============================================
+  const handleLoginSubmit = async (name: string, pass: string) => {
+    try {
+      const dbModule = await db;
+      const user = await dbModule.loginUser(name, pass);
+      if (user) {
+        const info = {
+          name: user.nickname,
+          profilePic: user.profile_pic,
+          statusMessage: user.status_message,
+          monthlyDistance: String(user.monthly_distance || 0),
+          lastUpdatedMonth: user.last_updated_month,
+          pbs: user.pbs || { '1KM': "00'00\"", '3KM': "00'00\"", '5KM': "00'00\"", '10KM': "00'00\"" },
+          monthlyGoal: String(user.monthly_goal || 100)
+        };
+        setProfileId(user.id);
+        setUserInfo(info);
+        localStorage.setItem('profileId', user.id);
+        localStorage.setItem('userInfo', JSON.stringify(info));
+        loadUserData(user.id, user.nickname);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error('Login failed:', e);
+      return false;
+    }
+  };
+
+  const handleSignupSubmit = async (data: any) => {
+    try {
+      const dbModule = await db;
+      const user = await dbModule.signupUser(data.name, data.password);
+      const info = {
+        name: user.nickname,
+        profilePic: null,
+        statusMessage: '러닝 열정 폭발 🔥',
+        monthlyDistance: '0',
+        lastUpdatedMonth: new Date().getMonth() + 1,
+        pbs: { '1KM': "00'00\"", '3KM': "00'00\"", '5KM': "00'00\"", '10KM': "00'00\"" },
+        monthlyGoal: data.monthlyGoal || '100'
+      };
+      setProfileId(user.id);
+      setUserInfo(info);
+      localStorage.setItem('profileId', user.id);
+      localStorage.setItem('userInfo', JSON.stringify(info));
+      setLoading(false);
+    } catch (e: any) {
+      alert('회원가입 실패: ' + (e.message || '중복된 닉네임일 수 있습니다.'));
+    }
   };
 
   const renderContent = () => {
@@ -2562,7 +2791,7 @@ const App: React.FC = () => {
       />
     );
 
-    if (isInputView) return <MissionInputView onBack={() => setIsInputView(false)} onSubmit={submitMission} isGroup={viewMode === 'group'} challenge={challenges.find(c => c.week === currentPeriod)} />;
+    if (isInputView) return <MissionInputView onBack={() => setIsInputView(false)} onSubmit={submitMissionHandler} isGroup={viewMode === 'group'} challenge={challenges.find(c => c.week === currentPeriod)} />;
 
     const isGroupCtx = viewMode === 'group' && userGroupId;
     switch (activeTab) {
@@ -2591,9 +2820,9 @@ const App: React.FC = () => {
             userRole={userRole}
             teams={teams}
             onLike={likeMission}
-            onComment={addComment}
+            onComment={addCommentHandler}
             onDeleteMission={deleteMission}
-            onDeleteComment={deleteComment}
+            onDeleteComment={deleteCommentHandler}
           />
         );
 
@@ -2608,6 +2837,7 @@ const App: React.FC = () => {
           onLeaveGroup={isGroupCtx ? () => leaveGroup(userGroupId as string) : undefined}
           currentGroupName={isGroupCtx ? (currentGroup?.name || '') : undefined}
           onLogout={() => {
+            setProfileId(null);
             setUserInfo({
               name: '',
               statusMessage: '러닝 열정 폭발 🔥',
@@ -2621,6 +2851,11 @@ const App: React.FC = () => {
             setUserTeamId(null);
             setUserRole('user');
             setMyGroupIds([]);
+            setGroups([]);
+            setTeams([]);
+            setMissions([]);
+            setGroupMembers([]);
+            setChallenges([]);
             setViewMode('individual');
             setActiveTab('home');
             localStorage.clear();
