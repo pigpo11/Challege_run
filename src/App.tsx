@@ -156,8 +156,8 @@ const GroupSelectorView = ({
           <div key={g.id} className="group-select-card" onClick={() => onSelect(g.id)}>
             <div className="flex-1">
               <h3 className="text-white text-18 bold">{g.name}</h3>
-              <p className="text-green font-12 mt-4 bold uppercase tracking-wider">전환하기</p>
             </div>
+            <p className="text-green font-12 bold uppercase tracking-wider shrink-0">전환하기</p>
           </div>
         ))}
       </div>
