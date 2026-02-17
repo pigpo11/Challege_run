@@ -407,25 +407,18 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions }: { currentGro
     : [];
 
   // Individual rankings within group
-  const groupIndividualRankings = [
-    { name: userInfo.name, distance: parseFloat(userInfo.monthlyDistance), team: '버핏 레이서', pic: userInfo.profilePic, isMe: true, status: userInfo.statusMessage },
-    { name: '이러닝', distance: 128.5, team: '버핏 레이서', pic: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&h=100&auto=format&fit=crop", status: '오늘도 한계에 도전합니다! 🔥' },
-    { name: '강속도', distance: 115.2, team: '고스트러너', pic: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=100&h=100&auto=format&fit=crop", status: '부상의 산을 넘어 다시 달립니다.' },
-    { name: '박스프린트', distance: 98.4, team: '버핏 레이서', pic: null, status: '서브4를 향하여! 🏅' },
-    { name: '조엔듀런스', distance: 85.0, team: '고스트러너', pic: null, status: '천천히 가도 멈추지 않습니다.' },
-    { name: '런닝맨', distance: 72.3, team: '스피드스타', pic: null, status: '바람을 가르는 러닝' },
-  ].sort((a, b) => b.distance - a.distance);
-
-  // Non-group individual rankings
-  const soloRankings = [
-    { name: userInfo.name, distance: parseFloat(userInfo.monthlyDistance), team: '-', pic: userInfo.profilePic, isMe: true, status: userInfo.statusMessage },
-    { name: '이러닝', distance: 128.5, team: '-', pic: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&h=100&auto=format&fit=crop", status: '오늘도 한계에 도전합니다! 🔥' },
-    { name: '강속도', distance: 115.2, team: '-', pic: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?q=80&w=100&h=100&auto=format&fit=crop", status: '부상의 산을 넘어 다시 달립니다.' },
-    { name: '박스프린트', distance: 98.4, team: '-', pic: null, status: '서브4를 향하여! 🏅' },
-    { name: '조엔듀런스', distance: 85.0, team: '-', pic: null, status: '천천히 가도 멈추지 않습니다.' },
-  ].sort((a, b) => b.distance - a.distance);
-
-  const individualRankings = isGroupMode ? groupIndividualRankings : soloRankings;
+  // Individual rankings derived from missions (mocked for demo, but should use real user data in production)
+  // For now, we only show the current user in a clean start
+  const individualRankings = [
+    {
+      name: userInfo.name,
+      distance: parseFloat(userInfo.monthlyDistance),
+      team: isGroupMode ? (teams.find(t => t.members.includes(userInfo.name))?.name || '-') : '-',
+      pic: userInfo.profilePic,
+      isMe: true,
+      status: userInfo.statusMessage
+    }
+  ];
 
   const renderPersonRow = (p: any, i: number) => (
     <div key={i} className={`ranking-row-v2 ${p.isMe ? 'active-user-row' : ''}`}>
@@ -1885,22 +1878,13 @@ const App: React.FC = () => {
 
   const [currentPeriod, setCurrentPeriod] = useState(1);
 
-  const [groups, setGroups] = useState<Group[]>([
-    { id: 'g1', name: '강남 러닝 크루', leaderId: 'leader1', inviteCode: 'RUN-777', totalScore: 3200, totalDistance: 215.5 },
-    { id: 'g2', name: '여의도 번개톤', leaderId: 'leader2', inviteCode: 'YEOUI-12', totalScore: 2850, totalDistance: 180.2 },
-  ]);
+  const [groups, setGroups] = useState<Group[]>([]);
 
-  const [teams, setTeams] = useState<Team[]>([
-    { id: 't1', groupId: 'g1', name: '버핏 레이서', members: ['김토스', '이러닝', '박스프린트', '최파워'] },
-    { id: 't2', groupId: 'g1', name: '고스트러너', members: ['강속도', '조엔듀런스', '한업힐', '윤리커버리'] },
-  ]);
+  const [teams, setTeams] = useState<Team[]>([]);
 
-  const [missions, setMissions] = useState<Mission[]>([
-    { id: 'm1', groupId: 'g1', teamId: 't1', userName: '김토스', week: 1, type: '베이스라인', status: 'none', likedBy: [], comments: [] },
-    { id: 'm2', groupId: 'g2', teamId: 't2', userName: '이러닝', week: 1, type: '베이스라인', status: 'approved', timestamp: '2024-02-15 10:00', likedBy: ['강속도', '조엔듀런스'], comments: [{ id: 'c1', userName: '강속도', text: '와 정말 빠르시네요!', timestamp: '10분 전' }], images: ['https://images.unsplash.com/photo-1541534741688-6078c64b5903?q=80&w=600'] },
-  ]);
+  const [missions, setMissions] = useState<Mission[]>([]);
 
-  const [groupMembers, setGroupMembers] = useState(['김토스', '이러닝', '박스프린트', '최파워', '강속도', '조엔듀런스', '한업힐', '윤리커버리', '런닝맨', '스피드스타', '번개맨', '러너A', '러너B']);
+  const [groupMembers, setGroupMembers] = useState<string[]>([]);
 
   const [challenges, setChallenges] = useState<WeeklyChallenge[]>([
     { id: 'c1', week: 1, title: '베이스라인 설정', description: '1/3/5km 개인 TT 측정 및 목표 설정', recordFields: [{ id: '1KM', label: '1KM', placeholder: '00:00', unit: '' }, { id: '3KM', label: '3KM', placeholder: '00:00', unit: '' }, { id: '5KM', label: '5KM', placeholder: '00:00', unit: '' }] },
