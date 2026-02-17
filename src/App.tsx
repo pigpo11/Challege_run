@@ -1816,13 +1816,24 @@ const LeaderView = ({
   const assignedMembers = groupTeams.flatMap(t => t.members);
   const availableMembers = allMembers.filter(m => !assignedMembers.includes(m));
 
-  // Mock records for members (for Member Management)
-  const memberRecordsMap: { [key: string]: string } = {
-    '김토스': '1K 03:45 / 5K 21:10',
-    '이러닝': '1K 04:10 / 5K 22:30',
-    '박스프린트': '1K 03:30 / 5K 19:45',
-    '최파워': '1K 04:20 / 5K 23:15',
-    '강속도': '1K 03:15 / 5K 18:50',
+  // 실제 missions 데이터에서 멤버별 최신 기록을 동적으로 집계
+  const getMemberLatestRecord = (memberName: string): string => {
+    const memberMissions = missions
+      .filter(m => m.userName === memberName && m.status === 'approved' && m.groupId === group.id && m.records)
+      .sort((a, b) => {
+        // timestamp 기준 내림차순 (최신 먼저)
+        if (!a.timestamp || !b.timestamp) return 0;
+        return b.timestamp.localeCompare(a.timestamp);
+      });
+
+    if (memberMissions.length === 0) return '기록 없음';
+
+    const latest = memberMissions[0];
+    const entries = Object.entries(latest.records || {});
+    if (entries.length === 0) return '기록 없음';
+
+    // 최대 2개 항목만 표시 (ex: "1KM 03'45" / 5KM 21'10"")
+    return entries.slice(0, 2).map(([key, val]) => `${key} ${val}`).join(' / ');
   };
 
   const handleStartRename = (teamId: string, name: string) => {
@@ -2036,7 +2047,7 @@ const LeaderView = ({
                 <div className="text-right flex items-center gap-12">
                   <div className="text-right">
                     <p className="text-green font-11 bold uppercase tracking-tighter">최근 기록</p>
-                    <p className="text-gray-300 font-12 mt-2">{memberRecordsMap[m] || '기록 없음'}</p>
+                    <p className="text-gray-300 font-12 mt-2">{getMemberLatestRecord(m)}</p>
                   </div>
                   <button
                     className="btn-kick-member-v2"
@@ -2484,8 +2495,19 @@ const App: React.FC = () => {
 
   const kickMember = (name: string) => {
     if (window.confirm(`${name} 멤버를 내보내시겠습니까?`)) {
+      // 1. 그룹 멤버 목록에서 제거
       setGroupMembers((prev: any) => prev.filter((m: any) => m !== name));
+      // 2. 모든 팀에서 제거
       setTeams((prev: any) => prev.map((t: any) => ({ ...t, members: t.members.filter((m: any) => m !== name) })));
+      // 3. 강퇴 대상이 현재 로그인한 유저인 경우 그룹 연결 해제
+      if (name === userInfo.name && userGroupId) {
+        setMyGroupIds(prev => prev.filter(id => id !== userGroupId));
+        setUserGroupId(null);
+        setUserTeamId(null);
+        setUserRole('user');
+        setViewMode('individual');
+        setActiveTab('home');
+      }
     }
   };
 
