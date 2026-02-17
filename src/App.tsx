@@ -131,7 +131,7 @@ const LoginView = ({ onLogin, allMembers }: { onLogin: (name: string) => void, a
   const handleLogin = () => {
     if (!nickname.trim()) return;
     if (allMembers.includes(nickname.trim())) {
-      setError('이미 사용 중인 닉네임입니다.');
+      setError('중복된 닉네임 입니다.');
       return;
     }
     onLogin(nickname.trim());
@@ -1852,39 +1852,68 @@ const App: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState('home');
   const [viewWeek, setViewWeek] = useState<number | null>(null);
-  const [userRole, setUserRole] = useState<'user' | 'leader'>('user');
-  const [userGroupId, setUserGroupId] = useState<string | null>(null);
-  const [userTeamId, setUserTeamId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'individual' | 'group'>('individual');
+  const [userRole, setUserRole] = useState<'user' | 'leader'>(() => (localStorage.getItem('userRole') as any) || 'user');
+  const [userGroupId, setUserGroupId] = useState<string | null>(() => localStorage.getItem('userGroupId'));
+  const [userTeamId, setUserTeamId] = useState<string | null>(() => localStorage.getItem('userTeamId'));
+  const [viewMode, setViewMode] = useState<'individual' | 'group'>(() => (localStorage.getItem('viewMode') as any) || 'individual');
   const [isInputView, setIsInputView] = useState(false);
   const [editingMission, setEditingMission] = useState<Mission | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  const [userInfo, setUserInfo] = useState({
-    name: '',
-    profilePic: null as string | null,
-    statusMessage: '러닝 열정 폭발 🔥',
-    monthlyDistance: '42.1',
-    lastUpdatedMonth: new Date().getMonth() + 1,
-    pbs: {
-      '1KM': "03'45\"",
-      '3KM': "12'20\"",
-      '5KM': "21'10\"",
-      '10KM': "44'30\""
-    },
-
-    monthlyGoal: '100'
+  const [userInfo, setUserInfo] = useState(() => {
+    const saved = localStorage.getItem('userInfo');
+    return saved ? JSON.parse(saved) : {
+      name: '',
+      profilePic: null as string | null,
+      statusMessage: '러닝 열정 폭발 🔥',
+      monthlyDistance: '42.1',
+      lastUpdatedMonth: new Date().getMonth() + 1,
+      pbs: {
+        '1KM': "03'45\"",
+        '3KM': "12'20\"",
+        '5KM': "21'10\"",
+        '10KM': "44'30\""
+      },
+      monthlyGoal: '100'
+    };
   });
 
   const [currentPeriod, setCurrentPeriod] = useState(1);
 
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [groups, setGroups] = useState<Group[]>(() => {
+    const saved = localStorage.getItem('groups');
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  const [teams, setTeams] = useState<Team[]>([]);
+  const [teams, setTeams] = useState<Team[]>(() => {
+    const saved = localStorage.getItem('teams');
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  const [missions, setMissions] = useState<Mission[]>([]);
+  const [missions, setMissions] = useState<Mission[]>(() => {
+    const saved = localStorage.getItem('missions');
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  const [groupMembers, setGroupMembers] = useState<string[]>([]);
+  const [groupMembers, setGroupMembers] = useState<string[]>(() => {
+    const saved = localStorage.getItem('groupMembers');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Sync state to localStorage
+  useEffect(() => {
+    localStorage.setItem('userInfo', JSON.stringify(userInfo));
+    localStorage.setItem('groups', JSON.stringify(groups));
+    localStorage.setItem('teams', JSON.stringify(teams));
+    localStorage.setItem('missions', JSON.stringify(missions));
+    localStorage.setItem('groupMembers', JSON.stringify(groupMembers));
+    if (userGroupId) localStorage.setItem('userGroupId', userGroupId);
+    else localStorage.removeItem('userGroupId');
+    if (userTeamId) localStorage.setItem('userTeamId', userTeamId);
+    else localStorage.removeItem('userTeamId');
+    localStorage.setItem('userRole', userRole);
+    localStorage.setItem('viewMode', viewMode);
+  }, [userInfo, groups, teams, missions, groupMembers, userGroupId, userTeamId, userRole, viewMode]);
 
   const [challenges, setChallenges] = useState<WeeklyChallenge[]>([
     { id: 'c1', week: 1, title: '베이스라인 설정', description: '1/3/5km 개인 TT 측정 및 목표 설정', recordFields: [{ id: '1KM', label: '1KM', placeholder: '00:00', unit: '' }, { id: '3KM', label: '3KM', placeholder: '00:00', unit: '' }, { id: '5KM', label: '5KM', placeholder: '00:00', unit: '' }] },
@@ -2106,6 +2135,7 @@ const App: React.FC = () => {
 
   const handleLoginSubmit = (name: string) => {
     setUserInfo(prev => ({ ...prev, name }));
+    setGroupMembers(prev => prev.includes(name) ? prev : [...prev, name]);
   };
 
   const renderContent = () => {
@@ -2168,6 +2198,7 @@ const App: React.FC = () => {
             setUserTeamId(null);
             setUserRole('user');
             setActiveTab('home');
+            localStorage.clear();
           }}
         />
       );
