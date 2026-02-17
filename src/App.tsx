@@ -1729,13 +1729,15 @@ const LeaderView = ({
   addMember: (teamId: string, name: string) => void,
   removeMember: (teamId: string, name: string) => void,
   kickMember: (name: string) => void,
-  allMembers: string[]
+  allMembers: string[],
+  onDeleteGroup: (id: string) => void
 }) => {
   const [adminTab, setAdminTab] = useState<'approval' | 'teams' | 'members'>('approval');
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [tempName, setTempName] = useState('');
   const [showMemberSelect, setShowMemberSelect] = useState<string | null>(null);
   const [showTeamMenu, setShowTeamMenu] = useState<string | null>(null);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
   const pendingMissions = missions.filter(m => m.status === 'pending' && m.groupId === group.id);
   const groupTeams = teams.filter(t => t.groupId === group.id);
@@ -1983,12 +1985,52 @@ const LeaderView = ({
 
   return (
     <div className="page-container">
-      <div className="px-16 mb-24 flex-between">
+      <div className="px-16 mb-24 flex-between relative">
         <div>
           <h2 className="section-title-alt">그룹 관리</h2>
           <p className="text-green font-12 bold mt-4 uppercase tracking-widest">Invite: {group.inviteCode}</p>
         </div>
-        <button className="btn-secondary-sm flex-center gap-4"><Share2 size={14} /> 초대</button>
+        <div className="relative">
+          <button
+            className="btn-secondary-sm p-8"
+            onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+          >
+            <MoreVertical size={20} />
+          </button>
+
+          <AnimatePresence>
+            {showSettingsMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                className="absolute right-0 top-48 w-160 bg-gray-900 border border-gray-800 rounded-12 shadow-2xl z-20 overflow-hidden"
+              >
+                <button
+                  className="w-full text-left px-16 py-12 text-white font-14 flex items-center gap-10 hover:bg-gray-800"
+                  onClick={() => {
+                    navigator.clipboard.writeText(group.inviteCode);
+                    alert(`초대코드(${group.inviteCode})가 복사되었습니다.`);
+                    setShowSettingsMenu(false);
+                  }}
+                >
+                  <Share2 size={16} className="text-green" /> 초대코드 복사
+                </button>
+                <button
+                  className="w-full text-left px-16 py-12 text-red font-14 flex items-center gap-10 hover:bg-gray-800 border-t border-gray-800"
+                  onClick={() => {
+                    if (window.confirm('정말로 이 그룹을 삭제하시겠습니까? 관련 데이터가 모두 삭제됩니다.')) {
+                      onDeleteGroup(group.id);
+                    }
+                    setShowSettingsMenu(false);
+                  }}
+                >
+                  <Trash2 size={16} /> 그룹 삭제
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Sub-Tabs Navigation */}
@@ -2311,6 +2353,16 @@ const App: React.FC = () => {
     }
   };
 
+  const deleteGroup = (id: string) => {
+    setGroups((prev: any) => prev.filter((g: any) => g.id !== id));
+    setTeams((prev: any) => prev.filter((t: any) => t.groupId !== id));
+    setUserGroupId(null);
+    setUserTeamId(null);
+    setUserRole('user');
+    setViewMode('individual');
+    setActiveTab('home');
+  };
+
   const handleLoginSubmit = (name: string, pass: string) => {
     const user = allUsers.find(u => u.name === name && u.password === pass);
     if (user) {
@@ -2414,6 +2466,7 @@ const App: React.FC = () => {
           removeMember={removeMember}
           kickMember={kickMember}
           allMembers={groupMembers}
+          onDeleteGroup={deleteGroup}
         />
       ) : <div className="empty-state-fit py-100 flex-center flex-col"><Shield size={48} className="text-gray-800 mb-16" /><p className="text-gray">그룹에 가입되어 있지 않습니다.</p><button className="btn-primary mt-20" onClick={() => setShowOnboarding(true)}>그룹 가입/생성하기</button></div>;
       default: return <HomeView group={isGroupCtx ? currentGroup || null : null} allGroups={groups} team={isGroupCtx ? currentTeam || null : null} missions={missions} userInfo={userInfo} onStartInput={() => setIsInputView(true)} currentWeek={currentPeriod} challenges={challenges} />;
