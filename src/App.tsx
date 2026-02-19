@@ -1894,40 +1894,42 @@ const LeaderView = ({
           const teamName = missionTeam ? missionTeam.name : '개인';
 
           return (
-            <div key={m.id} className="card admin-approve-card-v2 overflow-hidden shadow-2xl border-green/20">
-              <div className="flex-between mb-12 px-2">
+            <div key={m.id} className="card admin-approve-card-v2 animate-fadeIn">
+              <div className="flex-between mb-20">
                 <div className="flex flex-col gap-4">
-                  <div className="flex items-center gap-6">
-                    <span className="text-gray-500 font-10 bold uppercase tracking-widest">{m.type}</span>
-                  </div>
-                  <h3 className="text-white font-18 bold tracking-tight">[{teamName}] <span className="text-green">{m.userName}</span></h3>
+                  <span className="text-green font-11 bold uppercase tracking-widest">{m.type}</span>
+                  <h3 className="text-white font-22 bold tracking-tight">
+                    {teamName} <span className="text-gray-400 font-18 ml-4">|</span> <span className="ml-4">{m.userName}</span>
+                  </h3>
                 </div>
-                <button className="btn-approve-v2 shrink-0 py-8 px-16 bg-green hover:bg-green-light transition-colors" onClick={() => approveMission(m.id)}>
+                <button className="btn-approve-v2 shrink-0" onClick={() => approveMission(m.id)}>
                   <Check size={18} strokeWidth={3} />
-                  <span className="font-14 bold">승인</span>
+                  <span>승인하기</span>
                 </button>
               </div>
 
-              <div className="flex grid-horizontal-records py-18 border-t border-b border-gray-800 bg-white/5 mx--16">
+              <div className="grid-horizontal-records mb-20">
                 {Object.entries(m.records || {}).map(([key, val]) => (
-                  <div key={key} className="record-display-item border-r last:border-r-0 border-gray-800/50">
-                    <span className="text-gray-500 font-11 bold uppercase tracking-widest mb-6">{key}</span>
-                    <span className="text-white font-20 bold tracking-tighter">{String(val) || '00\'00"'}</span>
+                  <div key={key} className="record-display-item">
+                    <span className="text-gray-500 font-11 bold uppercase tracking-widest mb-4">{key}</span>
+                    <span className="text-white font-24 bold tracking-tighter">{String(val) || "00'00\""}</span>
                   </div>
                 ))}
               </div>
 
-
-
-
               {m.images && m.images.length > 0 && (
-                <div className="mt-16 flex flex-col gap-12">
-                  {m.images.map((img, i) => (
-                    <img key={i} src={img} alt="Mission" className="mission-approve-img-square shadow-lg" />
-                  ))}
+                <div className="flex flex-col gap-12">
+                  <div className="flex items-center gap-8 mb-4">
+                    <Camera size={14} className="text-gray-600" />
+                    <span className="text-gray-600 font-12 bold">인증 자료 ({m.images.length})</span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-12">
+                    {m.images.map((img, i) => (
+                      <img key={i} src={img} alt="Mission" className="mission-approve-img-square" />
+                    ))}
+                  </div>
                 </div>
               )}
-
             </div>
           );
         })}
@@ -3033,10 +3035,10 @@ const App: React.FC = () => {
         {toastMessage && (
           <motion.div
             className="toast-notification"
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            transition={{ duration: 0.3 }}
+            initial={{ opacity: 0, scale: 0.9, x: "-50%", y: "-50%" }}
+            animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+            exit={{ opacity: 0, scale: 0.9, x: "-50%", y: "-50%" }}
+            transition={{ duration: 0.2 }}
           >
             {toastMessage}
           </motion.div>
