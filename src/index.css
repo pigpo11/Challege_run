@@ -235,6 +235,10 @@ p {
   flex: 1;
 }
 
+.min-w-0 {
+  min-width: 0;
+}
+
 .flex-center {
   display: flex;
   align-items: center;
@@ -243,6 +247,10 @@ p {
 
 .items-center {
   align-items: center;
+}
+
+.items-start {
+  align-items: flex-start;
 }
 
 .items-baseline {
@@ -476,4 +484,13 @@ p {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+.truncate-2-lines {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

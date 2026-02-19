@@ -378,6 +378,8 @@
   border-radius: 20px;
   font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .status-pill.approved {
@@ -1156,18 +1158,41 @@
 }
 
 .pb-num-input-v2 {
-  width: 44px;
+  width: 38px;
+  /* Reduced from 44px */
   background: transparent;
   border: none;
   color: #fff;
-  font-size: 20px;
+  font-size: 19px;
+  /* Slightly reduced */
   font-weight: 800;
   text-align: center;
-  padding: 12px 0;
+  padding: 10px 0;
+  /* Slightly reduced */
   outline: none;
   font-family: inherit;
   appearance: textfield;
   /* Firefox */
+}
+
+/* Mobile responsive adjustments for PB section */
+@media (max-width: 360px) {
+  .pb-input-grid-v2 {
+    gap: 12px 8px;
+  }
+
+  .pb-time-picker-v2 {
+    padding: 2px 4px;
+  }
+
+  .pb-num-input-v2 {
+    width: 34px;
+    font-size: 17px;
+  }
+
+  .profile-edit-card-v2 {
+    padding: 20px 16px;
+  }
 }
 
 /* Hide spin buttons */

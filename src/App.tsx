@@ -515,12 +515,12 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
       ) : (
         <>
           <div className="card mission-status-card mt-32">
-            <div className="flex-between">
-              <div>
+            <div className="flex-between items-start">
+              <div className="flex-1 min-w-0">
                 <h3 className="text-white">{currentWeek}주차 미션</h3>
-                <p className="text-gray font-14">{currentChallenge ? `${currentChallenge.title} (${currentChallenge.description.substring(0, 15)}...)` : '진행 중인 미션이 없습니다.'}</p>
+                <p className="text-gray font-14 truncate-2-lines">{currentChallenge ? `${currentChallenge.title} (${currentChallenge.description.substring(0, 15)}...)` : '진행 중인 미션이 없습니다.'}</p>
               </div>
-              <div className={`status-pill ${aggregateStatus}`}>
+              <div className={`status-pill ${aggregateStatus} ml-12`}>
                 {aggregateStatus === 'approved' ? '승인완료' : aggregateStatus === 'pending' ? '승인대기' : '미제출'}
               </div>
             </div>
@@ -2497,19 +2497,34 @@ const App: React.FC = () => {
   // Profile (Supabase-backed)
   // ============================================
   const handleUpdateProfile = async (name: string, status: string, pic: string | null, dist: string, pbs: any, goal?: string) => {
+    // Check if nickname changed and if it's already taken
+    if (name !== userInfo.name && allUserNames.includes(name)) {
+      alert('이미 사용 중인 닉네임입니다.');
+      return;
+    }
+
     setUserInfo((prev: any) => ({ ...prev, name, statusMessage: status, profilePic: pic, monthlyDistance: dist, pbs, monthlyGoal: goal || prev.monthlyGoal }));
+
     if (profileId) {
       try {
         await db.updateProfile(profileId, {
+          nickname: name, // Added this field
           status_message: status,
           profile_pic: pic,
           monthly_distance: parseFloat(dist) || 0,
           pbs,
           monthly_goal: parseFloat(goal || '100')
         });
+
+        // Update allUserNames list
+        if (name !== userInfo.name) {
+          setAllUserNames(prev => [...prev.filter(n => n !== userInfo.name), name]);
+        }
+
         localStorage.setItem('userInfo', JSON.stringify({ ...userInfo, name, statusMessage: status, profilePic: pic, monthlyDistance: dist, pbs, monthlyGoal: goal || userInfo.monthlyGoal }));
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to update profile:', e);
+        alert('프로필 업데이트에 실패했습니다: ' + (e.message || ''));
       }
     }
   };
