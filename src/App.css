@@ -768,18 +768,20 @@
 }
 
 .pb-dist {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 800;
   color: var(--fit-green);
   opacity: 1;
 }
 
+
 .pb-time {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 800;
   color: #fff;
   letter-spacing: -0.5px;
 }
+
 
 .font-48 {
   font-size: 48px;
