@@ -139,29 +139,37 @@ p {
   position: sticky;
   bottom: 0;
   width: 100%;
-  height: 65px;
-  background-color: rgba(0, 0, 0, 0.9);
+  height: 68px;
+  background-color: rgba(0, 0, 0, 0.85);
   backdrop-filter: blur(20px);
   display: flex;
-  justify-content: space-around;
-  align-items: center;
-  border-top: 1px solid var(--fit-gray-800);
+  align-items: stretch;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-bottom: var(--safe-area-inset-bottom);
   z-index: 100;
 }
 
 .nav-item {
+  flex: 1;
   color: var(--fit-gray-600);
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
 }
 
 .nav-item.active {
   color: var(--fit-green);
+}
+
+.nav-item:active {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 /* Large Buttons */

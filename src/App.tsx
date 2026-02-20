@@ -19,7 +19,9 @@ type Team = {
   groupId: string;
   name: string;
   members: string[];
+  bonusPoints: number;
 };
+
 
 type Mission = {
   id: string;
@@ -50,8 +52,82 @@ type WeeklyChallenge = {
   week: number;
   title: string;
   description: string;
-  recordFields?: { id: string; label: string; placeholder: string; unit: string }[];
+  recordFields?: { id: string; label: string; placeholder?: string; unit?: string; category?: 'personal' | 'strength' | 'team'; sub?: string }[];
 };
+
+const WEEK1_STRUCTURE = {
+  personal: [
+    { id: 'p1', title: '정규수업 주 4회 참여', sub: '스페셜 클래스 포함' },
+    { id: 'p2', title: '주 4일 5km 러닝', sub: '트레드밀, 무동력 트레드밀, 야외러닝' },
+  ],
+  strength: [
+    { id: 's1', title: 'Bulgarian Split Squat', sub: '12 REPS / LEG x 5 SETS' },
+    { id: 's2', title: 'Sled Push 40m', sub: '40M PUSH x 5 SETS' },
+    { id: 's3', title: '복근 운동', sub: '영상 루틴 수행' },
+  ],
+  team: [
+    { id: 't1', title: '팀 미션 (전부 수행)', sub: '① EMOM 10 + ② 트레드밀 인터벌' },
+  ]
+};
+
+const calculatePoints = (missions: Mission[], userName: string, challenges?: WeeklyChallenge[]) => {
+  const userMissions = missions.filter(m => m.userName === userName && m.status === 'approved');
+
+  // Group missions by week
+  const missionsByWeek = userMissions.reduce((acc: any, m) => {
+    if (!acc[m.week]) acc[m.week] = [];
+    acc[m.week].push(m);
+    return acc;
+  }, {});
+
+  let totalScore = 0;
+
+  Object.keys(missionsByWeek).forEach(weekStr => {
+    const week = parseInt(weekStr);
+    const weeklyMissions = missionsByWeek[week];
+
+    if (week === 1) {
+      const completedIds = weeklyMissions.map((m: Mission) => m.records?.missionId).filter(Boolean);
+      let weeklyScore = 0;
+
+      const week1Challenge = challenges?.find(c => c.week === 1);
+      const dbPersonal = week1Challenge?.recordFields?.filter(f => f.category === 'personal') || [];
+      const dbStrength = week1Challenge?.recordFields?.filter(f => f.category === 'strength') || [];
+      const dbTeam = week1Challenge?.recordFields?.filter(f => f.category === 'team') || [];
+
+      // Personal
+      const pFields = week1Challenge ? dbPersonal : WEEK1_STRUCTURE.personal;
+      const pCount = pFields.filter(m => completedIds.includes(m.id)).length;
+      if (pCount === 2) weeklyScore += 7;
+      else if (pCount === 1) weeklyScore += 3;
+
+      // Strength
+      const sFields = week1Challenge ? dbStrength : WEEK1_STRUCTURE.strength;
+      const sCount = sFields.filter(m => completedIds.includes(m.id)).length;
+      if (sCount >= sFields.length && sFields.length > 0) weeklyScore += 10;
+
+      // Team
+      const tFields = week1Challenge ? dbTeam : WEEK1_STRUCTURE.team;
+      const teamMissions = weeklyMissions.filter((m: Mission) => tFields.some(tf => tf.id === m.records?.missionId));
+
+      teamMissions.forEach((tm: any) => {
+        const pCount = parseInt(tm.records?.participantCount || '1');
+        if (pCount >= 4) weeklyScore += 45;
+        else if (pCount >= 2) weeklyScore += 20;
+        else weeklyScore += 4;
+      });
+
+      totalScore += weeklyScore;
+    } else {
+      // Other weeks: 10 points per approved challenge certification
+      totalScore += weeklyMissions.filter((m: Mission) => m.type === '챌린지 인증').length * 10;
+    }
+  });
+
+  return totalScore;
+};
+
+
 
 const OnboardingView = ({ onCreate, onJoin, onBack, allGroupNames }: { onCreate: (n: string) => void, onJoin: (c: string) => void, onBack: () => void, allGroupNames: string[] }) => {
   const [mode, setMode] = useState<'choice' | 'create' | 'join'>('choice');
@@ -399,9 +475,8 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
   const aggregateStatus = myMissions.length === 0 ? 'none' :
     myMissions.some(m => m.status === 'pending') ? 'pending' : 'approved';
 
-  const myPoints = missions.filter(m => m.userName === userInfo.name && m.status === 'approved' && m.type === '챌린지 인증').length * 10;
-  const teamMissions = team ? missions.filter(m => team.members.includes(m.userName) && m.status === 'approved' && m.type === '챌린지 인증') : [];
-  const teamPoints = teamMissions.length * 10;
+  const myPoints = calculatePoints(missions, userInfo.name, challenges);
+  const teamPoints = team ? (team.members.reduce((sum, name) => sum + calculatePoints(missions, name, challenges), 0) + (team.bonusPoints || 0)) : 0;
 
   const sortedGroupsByDistance = [...allGroups].sort((a, b) => (b.totalDistance || 0) - (a.totalDistance || 0));
   const myGroupRank = group ? sortedGroupsByDistance.findIndex(g => g.id === group.id) + 1 : null;
@@ -515,18 +590,70 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
       ) : (
         <>
           <div className="card mission-status-card mt-32">
-            <div className="flex-between items-start">
+            <div className="flex-between items-start mb-24">
               <div className="flex-1 min-w-0">
                 <h3 className="text-white">{currentWeek}주차 미션</h3>
-                <p className="text-gray font-14 truncate-2-lines">{currentChallenge ? `${currentChallenge.title} (${currentChallenge.description.substring(0, 15)}...)` : '진행 중인 미션이 없습니다.'}</p>
+                <p className="text-gray font-14 truncate-2-lines">{currentChallenge ? `${currentChallenge.title}` : '진행 중인 미션이 없습니다.'}</p>
               </div>
               <div className={`status-pill ${aggregateStatus} ml-12`}>
                 {aggregateStatus === 'approved' ? '승인완료' : aggregateStatus === 'pending' ? '승인대기' : '미제출'}
               </div>
             </div>
 
-            <button className="btn-primary w-full mt-24 flex-center gap-8 py-20" onClick={onStartInput}>
-              <Camera size={20} /> {myMissions.length === 0 ? '오늘의 챌린지 인증하기' : '추가 인증하기'}
+            {(currentWeek === 1 || (currentChallenge?.recordFields && currentChallenge.recordFields.some(f => f.category))) && (
+              <div className="mission-container flex flex-col gap-24 mt-32">
+                {['personal', 'strength', 'team'].map(cat => {
+                  const dbFields = currentChallenge?.recordFields?.filter(f => f.category === cat) || [];
+                  // If challenge object exists, show its fields. If not, fallback to hardcoded ONLY for Week 1.
+                  const fields = currentChallenge
+                    ? dbFields
+                    : (currentWeek === 1 ? (WEEK1_STRUCTURE as any)[cat] : []);
+
+                  if (fields.length === 0) return null;
+
+                  return (
+                    <div key={cat} className="mission-category-section">
+                      <div className="category-header">
+                        <div className="category-title-wrap">
+                          {cat === 'personal' ? <Zap size={18} className="text-green" /> :
+                            cat === 'strength' ? <Activity size={18} className="text-green" /> :
+                              <Trophy size={18} className="text-green" />}
+                          <span className="category-name">{cat === 'personal' ? '개인' : cat === 'strength' ? '스트렝스' : '팀 미션'}</span>
+                        </div>
+                        {cat === 'team' && currentWeek === 1 && <span className="category-reward-badge">1인 <b>4P</b> / 2인 <b>20P</b> / 4인 <b>45P</b></span>}
+                        {cat === 'personal' && currentWeek === 1 && <span className="category-reward-badge">2개 <b>7P</b> / 1개 <b>3P</b></span>}
+                        {cat === 'strength' && currentWeek === 1 && <span className="category-reward-badge">모두 수행시 <b>10P</b></span>}
+                      </div>
+                      <div className="mission-grid">
+                        {fields.map((m: any, idx: number) => {
+                          const record = myMissions.find(rm => rm.records?.missionId === (m.id || m.label));
+                          const status = record?.status || 'none';
+                          const pCount = record?.records?.participantCount;
+
+                          return (
+                            <div key={m.id || m.label} className={`mission-item-card ${status}`}>
+                              <div className="mission-item-content">
+                                <div className="mission-number">{idx + 1}</div>
+                                <div className="mission-text-wrap">
+                                  <p className="mission-title">{m.title || m.label} {status !== 'none' && pCount && <span className="text-green ml-4">({pCount}인)</span>}</p>
+                                  <p className="mission-sub">{m.sub}</p>
+                                </div>
+                                <div className="mission-status-icon">
+                                  <Check size={16} />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <button className="btn-primary-lg w-full mt-32 flex-center gap-8 py-20" onClick={onStartInput}>
+              <Camera size={20} /> {myMissions.length === 0 ? '오늘의 챌린지 인증하기' : '미션 리스트 확인 및 추가 인증'}
             </button>
 
             {aggregateStatus === 'pending' && (
@@ -616,11 +743,11 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
           </div>
         </>
       )}
-    </div>
+    </div >
   );
 };
 
-const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGroupIds }: { currentGroupId: string | null, userInfo: any, teams: Team[], missions: Mission[], groups: Group[], myGroupIds: string[] }) => {
+const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGroupIds, challenges }: { currentGroupId: string | null, userInfo: any, teams: Team[], missions: Mission[], groups: Group[], myGroupIds: string[], challenges: WeeklyChallenge[] }) => {
   const [rankTab, setRankTab] = useState<'team' | 'individual'>('team');
   const [displayGroupIdx, setDisplayGroupIdx] = useState(0);
 
@@ -654,7 +781,7 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGrou
   // Calculate real team rankings based on challenge points (this month only)
   const teamRankings = isGroupMode
     ? teams.filter(t => t.groupId === currentGroupId).map(t => {
-      const points = currentMonthMissions.filter(m => t.members.includes(m.userName) && m.status === 'approved' && m.type === '챌린지 인증').length * 10;
+      const points = t.members.reduce((sum, name) => sum + calculatePoints(currentMonthMissions, name, challenges), 0) + (t.bonusPoints || 0);
       return { name: t.name, pts: points, members: t.members.length };
     }).sort((a, b) => b.pts - a.pts)
     : [];
@@ -1250,26 +1377,24 @@ const DistanceExtractor = ({ onExtract, onImageSelect, distance, setDistance, is
 
 
 
-const MissionInputView = ({ onBack, onSubmit, isGroup, challenge, initialMission }: { onBack: () => void, onSubmit: (r: any, p: string[], d: string) => void, isGroup: boolean, challenge?: WeeklyChallenge, initialMission?: Mission }) => {
+const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initialMission, currentWeek, missions, currentUserName }: { onBack: () => void, onSubmit: (r: any, p: string[], d: string) => void, onToast: (msg: string) => void, isGroup: boolean, challenge?: WeeklyChallenge, initialMission?: Mission, currentWeek: number, missions: Mission[], currentUserName: string }) => {
   const [records, setRecords] = useState<any>(initialMission?.records || {});
   const [photos, setPhotos] = useState<string[]>(initialMission?.images || []);
   const [runDistance, setRunDistance] = useState<string>(initialMission ? String(initialMission.distance) : '0');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const completedMissionIds = missions
+    .filter(m => m.userName === currentUserName && m.id !== initialMission?.id && m.week === currentWeek)
+    .map(m => m.records?.missionId)
+    .filter(Boolean);
+
   // Initialize records based on challenge fields if not editing
   useEffect(() => {
     if (initialMission) return;
 
-    if (challenge?.recordFields) {
-      const initialRecords: any = {};
-      challenge.recordFields.forEach(f => initialRecords[f.id] = '');
-      setRecords(initialRecords);
-    } else {
-      // Fallback for when there is no specific challenge
-      setRecords({ '1KM': '' });
-    }
-
+    // Reset records to empty for new mission
+    setRecords({});
   }, [challenge, initialMission]);
 
 
@@ -1320,10 +1445,19 @@ const MissionInputView = ({ onBack, onSubmit, isGroup, challenge, initialMission
     setRunDistance(dist);
   };
 
+
   const handleExtractedImage = (url: string) => {
     if (photos.length < 7) {
       setPhotos(prev => [...prev, url]);
     }
+  };
+
+  const handleFinalSubmit = () => {
+    if (isGroup && !records.missionId) {
+      onToast('하나 이상의 미션을 선택해주세요');
+      return;
+    }
+    onSubmit(records, photos, runDistance);
   };
 
 
@@ -1386,96 +1520,156 @@ const MissionInputView = ({ onBack, onSubmit, isGroup, challenge, initialMission
 
 
         {isGroup && (
-          <div className="animate-fadeIn mt-80 mb-40">
+          <div className="animate-fadeIn mt-60 mb-40">
             <h3 className="text-white font-18 bold mb-24">챌린지 기록</h3>
 
-            <div className="record-card">
-              {challenge?.recordFields && challenge.recordFields.length > 0 ? (
-                challenge.recordFields.map((field, idx) => (
-                  <React.Fragment key={field.id}>
-                    <div className="record-row group">
-                      <label className="record-label">{field.label}</label>
-                      <div className="record-time-picker">
-                        <input
-                          type="number"
-                          className="record-time-input-small no-spinner"
-                          placeholder="00"
-                          value={parseMin(records[field.id])}
-                          onChange={(e) => {
-                            const val = e.target.value.slice(0, 2);
-                            updateTimeRecord(field.id, val, 'min');
-                            if (val.length === 2) {
-                              // Auto focus next input (seconds)
-                              document.getElementById(`sec-${field.id}`)?.focus();
-                            }
-                          }}
-                          onFocus={(e) => e.target.select()}
-                        />
-                        <span className="record-time-sep">'</span>
-                        <input
-                          id={`sec-${field.id}`}
-                          type="number"
-                          className="record-time-input-small no-spinner"
-                          placeholder="00"
-                          value={parseSec(records[field.id])}
-                          onChange={(e) => updateTimeRecord(field.id, e.target.value.slice(0, 2), 'sec')}
-                          onFocus={(e) => e.target.select()}
-                        />
-                        <span className="record-time-sep">"</span>
-                      </div>
+            {challenge?.week === 1 || (challenge?.recordFields && challenge.recordFields.some(f => f.category)) ? (
+              <div className="mission-selector-container">
+                <p className="text-gray-500 font-13 mb-8">수행하신 미션을 선택해 주세요.</p>
+                {['personal', 'strength', 'team'].map(cat => {
+                  const dbItems = challenge?.recordFields?.filter(f => f.category === cat) || [];
+                  const items = challenge
+                    ? dbItems
+                    : (currentWeek === 1 ? (WEEK1_STRUCTURE as any)[cat] : []);
+
+                  if (items.length === 0) return null;
+
+                  return (
+                    <div key={cat} className="flex flex-col gap-12 mt-16">
+                      <span className="text-green font-12 bold uppercase tracking-wider px-8 mb-4">{cat === 'personal' ? '개인' : cat === 'strength' ? '스트렝스' : '팀 미션'}</span>
+                      {items.map((item: any) => {
+                        const itemId = item.id || item.label;
+                        const isAlreadySubmitted = completedMissionIds.includes(itemId);
+
+                        return (
+                          <div
+                            key={itemId}
+                            className={`selector-item ${records.missionId === itemId ? 'active' : ''} ${isAlreadySubmitted ? 'opacity-40' : ''}`}
+                            onClick={() => {
+                              if (isAlreadySubmitted) {
+                                onToast('이미 제출한 미션 입니다');
+                                return;
+                              }
+                              setRecords({ ...records, missionId: itemId, category: cat });
+                            }}
+                          >
+                            <div className="flex-between">
+                              <div>
+                                <p className="mission-title">{item.title || item.label}</p>
+                                <p className="mission-sub">{item.sub}</p>
+                              </div>
+                              {isAlreadySubmitted && (
+                                <span className="bg-white/10 text-gray-400 font-10 bold px-6 py-2 rounded-4">제출됨</span>
+                              )}
+                            </div>
+
+                            {cat === 'team' && records.missionId === itemId && (
+                              <div className="participant-picker" onClick={e => e.stopPropagation()}>
+                                <p className="text-gray-500 font-12 mr-8">참여 인원:</p>
+                                {[1, 2, 4].map(num => (
+                                  <div
+                                    key={num}
+                                    className={`participant-bubble ${String(records.participantCount || '1') === String(num) ? 'active' : ''}`}
+                                    onClick={() => setRecords({ ...records, participantCount: String(num) })}
+                                  >
+                                    {num}인
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                    {idx < (challenge.recordFields?.length || 0) - 1 && <div className="record-divider" />}
-                  </React.Fragment>
-
-                ))
-              ) : (
-                <div className="record-row">
-                  <label className="record-label">1KM</label>
-                  <div className="record-time-picker">
-                    <input
-                      type="number"
-                      className="record-time-input-small no-spinner"
-                      placeholder="00"
-                      value={parseMin(records['1KM'])}
-                      onChange={(e) => {
-                        const val = e.target.value.slice(0, 2);
-                        updateTimeRecord('1KM', val, 'min');
-                        if (val.length === 2) {
-                          document.getElementById('sec-1KM')?.focus();
-                        }
-                      }}
-                      onFocus={(e) => e.target.select()}
-                    />
-                    <span className="record-time-sep">'</span>
-                    <input
-                      id="sec-1KM"
-                      type="number"
-                      className="record-time-input-small no-spinner"
-                      placeholder="00"
-                      value={parseSec(records['1KM'])}
-                      onChange={(e) => updateTimeRecord('1KM', e.target.value.slice(0, 2), 'sec')}
-                      onFocus={(e) => e.target.select()}
-                    />
-
-                    <span className="record-time-sep">"</span>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="record-card">
+                {challenge?.recordFields && challenge.recordFields.length > 0 ? (
+                  challenge.recordFields.map((field, idx) => (
+                    <React.Fragment key={field.id}>
+                      <div className="record-row group">
+                        <label className="record-label">{field.label}</label>
+                        <div className="record-time-picker">
+                          <input
+                            type="number"
+                            className="record-time-input-small no-spinner"
+                            placeholder="00"
+                            value={parseMin(records[field.id])}
+                            onChange={(e) => {
+                              const val = e.target.value.slice(0, 2);
+                              updateTimeRecord(field.id, val, 'min');
+                              if (val.length === 2) {
+                                document.getElementById(`sec-${field.id}`)?.focus();
+                              }
+                            }}
+                            onFocus={(e) => e.target.select()}
+                          />
+                          <span className="record-time-sep">'</span>
+                          <input
+                            id={`sec-${field.id}`}
+                            type="number"
+                            className="record-time-input-small no-spinner"
+                            placeholder="00"
+                            value={parseSec(records[field.id])}
+                            onChange={(e) => updateTimeRecord(field.id, e.target.value.slice(0, 2), 'sec')}
+                            onFocus={(e) => e.target.select()}
+                          />
+                          <span className="record-time-sep">"</span>
+                        </div>
+                      </div>
+                      {idx < (challenge.recordFields?.length || 0) - 1 && <div className="record-divider" />}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <div className="record-row">
+                    <label className="record-label">1KM</label>
+                    <div className="record-time-picker">
+                      <input
+                        type="number"
+                        className="record-time-input-small no-spinner"
+                        placeholder="00"
+                        value={parseMin(records['1KM'])}
+                        onChange={(e) => {
+                          const val = e.target.value.slice(0, 2);
+                          updateTimeRecord('1KM', val, 'min');
+                          if (val.length === 2) {
+                            document.getElementById('sec-1KM')?.focus();
+                          }
+                        }}
+                        onFocus={(e) => e.target.select()}
+                      />
+                      <span className="record-time-sep">'</span>
+                      <input
+                        id="sec-1KM"
+                        type="number"
+                        className="record-time-input-small no-spinner"
+                        placeholder="00"
+                        value={parseSec(records['1KM'])}
+                        onChange={(e) => updateTimeRecord('1KM', e.target.value.slice(0, 2), 'sec')}
+                        onFocus={(e) => e.target.select()}
+                      />
+                      <span className="record-time-sep">"</span>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-
+                )}
+              </div>
+            )}
           </div>
         )}
+
 
       </div>
 
       <div className="px-20 pb-32 pt-16">
-        <button className="btn-primary-lg" onClick={() => onSubmit(records, photos, runDistance)}>제출하기</button>
+        <button className="btn-primary-lg" onClick={handleFinalSubmit}>제출하기</button>
       </div>
     </div>
   );
 };
 
-const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComment, onDeleteMission, onDeleteComment }: {
+const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComment, onDeleteMission, onDeleteComment, challenges }: {
   mission: Mission,
   currentUserName: string,
   userRole: string,
@@ -1483,7 +1677,8 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
   onLike: (id: string) => void,
   onComment: (id: string, text: string) => void,
   onDeleteMission?: (id: string) => void,
-  onDeleteComment?: (mId: string, cId: string) => void
+  onDeleteComment?: (mId: string, cId: string) => void,
+  challenges: WeeklyChallenge[]
 }) => {
   const [commentText, setCommentText] = useState('');
   const isLiked = mission.likedBy.includes(currentUserName);
@@ -1491,6 +1686,31 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
   const isAuthor = mission.userName === currentUserName;
 
   const authorTeam = teams.find(t => t.id === mission.teamId) || teams.find(t => t.members.includes(mission.userName));
+
+  const challenge = challenges.find(c => c.week === mission.week);
+  const missionId = mission.records?.missionId;
+  const category = mission.records?.category;
+  let missionTitle = "";
+  let categoryLabel = "";
+
+  if (category === 'personal') categoryLabel = '개인';
+  else if (category === 'strength') categoryLabel = '스트렝스';
+  else if (category === 'team') categoryLabel = '팀 미션';
+
+  if (missionId) {
+    const field = challenge?.recordFields?.find(f => f.id === missionId);
+    if (field) missionTitle = field.label;
+    else {
+      // Fallback to WEEK1_STRUCTURE
+      const allW1 = [...WEEK1_STRUCTURE.personal, ...WEEK1_STRUCTURE.strength, ...WEEK1_STRUCTURE.team];
+      const w1Field = (allW1 as any[]).find(f => f.id === missionId);
+      if (w1Field) missionTitle = w1Field.title;
+    }
+  }
+
+  const displayTag = missionTitle
+    ? `${categoryLabel ? categoryLabel + ' - ' : ''}${missionTitle} / ${mission.week}주차`
+    : (mission.type === '개인 러닝' ? `개인 러닝 / ${mission.week}주차` : `${mission.week}주차 인증`);
 
   const handleCommentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1509,7 +1729,7 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
               <p className="name">{mission.userName}</p>
               {authorTeam && <span className="font-12 text-gray-500 bg-gray-900 px-6 py-2 rounded-4">{authorTeam.name}</span>}
             </div>
-            <p className="meta">{mission.timestamp} · {mission.type === '개인 러닝' ? '개인 러닝' : `${mission.week}주차 인증`}</p>
+            <p className="meta">{new Date(mission.timestamp || new Date()).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · {displayTag}</p>
           </div>
         </div>
         {(isAdmin || isAuthor) && (
@@ -1588,7 +1808,8 @@ const WeeklyFeedView = ({
   onLike,
   onComment,
   onDeleteMission,
-  onDeleteComment
+  onDeleteComment,
+  challenges
 }: {
   week: number | null,
   missions: Mission[],
@@ -1598,7 +1819,8 @@ const WeeklyFeedView = ({
   onLike: (id: string) => void,
   onComment: (id: string, text: string) => void,
   onDeleteMission?: (id: string) => void,
-  onDeleteComment?: (mId: string, cId: string) => void
+  onDeleteComment?: (mId: string, cId: string) => void,
+  challenges: WeeklyChallenge[]
 }) => {
   return (
     <div className="page-container flex flex-col h-full bg-black">
@@ -1620,6 +1842,7 @@ const WeeklyFeedView = ({
                 onComment={onComment}
                 onDeleteMission={onDeleteMission}
                 onDeleteComment={onDeleteComment}
+                challenges={challenges}
               />
 
             ))}
@@ -1655,7 +1878,7 @@ const ChallengeView = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
-  const [editFields, setEditFields] = useState<{ id: string; label: string; placeholder: string; unit: string }[]>([]);
+  const [editFields, setEditFields] = useState<{ id: string; label: string; placeholder?: string; unit?: string; category?: 'personal' | 'strength' | 'team'; sub?: string }[]>([]);
   const [showMenu, setShowMenu] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -1668,14 +1891,15 @@ const ChallengeView = ({
   };
 
   const handleSave = (id: string) => {
-    onUpdate(id, editTitle, editDesc, editFields);
+    // Filter out items that have neither title nor subtitle
+    const validFields = editFields.filter(f => f.label.trim() !== '' || (f.sub && f.sub.trim() !== ''));
+    onUpdate(id, editTitle, editDesc, validFields);
     setEditingId(null);
   };
 
-  const addField = () => {
-    setEditFields([...editFields, { id: `f${Date.now()}`, label: '기록 항목', placeholder: '00:00', unit: '' }]);
+  const addField = (category: 'personal' | 'strength' | 'team') => {
+    setEditFields([...editFields, { id: `f${Date.now()}-${Math.random().toString(36).substr(2, 4)}`, label: '', placeholder: '', unit: '', category, sub: '' }]);
   };
-
 
   const updateField = (idx: number, key: string, val: string) => {
     const newFields = [...editFields];
@@ -1726,27 +1950,50 @@ const ChallengeView = ({
                 />
 
                 <div className="mt-12">
-                  <div className="flex-between mb-12">
-                    <span className="text-gray-400 font-12 bold uppercase tracking-wider">기록 항목 설정 (예: 1km, 페이스)</span>
-                    <button className="btn-add-field-v2" onClick={addField}>+ 항목 추가</button>
-                  </div>
+                  <span className="text-gray-400 font-12 bold uppercase tracking-wider mb-12 block">기록 항목 설정 (카테고리별)</span>
 
-                  <div className="challenge-fields-list-v2">
-                    {editFields.map((field, idx) => (
-                      <div key={field.id} className="challenge-field-row-v2">
-                        <input
-                          className="field-input-premium"
-                          value={field.label}
-                          onChange={(e) => updateField(idx, 'label', e.target.value)}
-                          placeholder="항목 이름을 입력하세요"
-                        />
-                        <button className="btn-delete-subtle" onClick={() => removeField(idx)}>
-                          <Trash size={16} />
-                        </button>
+                  {['personal', 'strength', 'team'].map(cat => (
+                    <div key={cat} className="mb-24">
+                      <div className="flex-between mb-8 px-4">
+                        <span className="text-green font-11 bold uppercase tracking-widest">
+                          {cat === 'personal' ? '개인 미션' : cat === 'strength' ? '스트렝스' : '팀 미션'}
+                        </span>
+                        <button className="btn-add-field-v2" onClick={() => addField(cat as any)}>+ 항목 추가</button>
                       </div>
 
-                    ))}
-                  </div>
+                      <div className="challenge-fields-list-v2">
+                        {editFields.map((field, realIdx) => {
+                          if (field.category !== cat) return null;
+                          return (
+                            <div key={field.id} className="challenge-field-card-v2 animate-fadeIn">
+                              <div className="flex items-center gap-12">
+                                <div className="flex-1 flex flex-col gap-8">
+                                  <input
+                                    className="field-input-premium-v2"
+                                    value={field.label}
+                                    onChange={(e) => updateField(realIdx, 'label', e.target.value)}
+                                    placeholder="미션 제목 (예: 주 4일 5km 러닝)"
+                                  />
+                                  <input
+                                    className="field-input-subtext-v2"
+                                    value={field.sub || ''}
+                                    onChange={(e) => updateField(realIdx, 'sub', e.target.value)}
+                                    placeholder="상세 설명 (예: 트레드밀, 야외러닝)"
+                                  />
+                                </div>
+                                <button className="btn-delete-field-v2" onClick={() => removeField(realIdx)}>
+                                  <Trash size={16} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {editFields.filter(f => f.category === cat).length === 0 && (
+                          <div className="field-empty-placeholder">등록된 항목이 없습니다.</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
 
 
@@ -1815,32 +2062,80 @@ const ChallengeView = ({
   );
 };
 
+const BonusPointsInput = ({ initialValue, onUpdate }: { initialValue: number, onUpdate: (val: number) => void }) => {
+  const [val, setVal] = useState<string>(initialValue === 0 ? '' : initialValue.toString());
+
+  // Update local value if initialValue changes from outside
+  useEffect(() => {
+    if (initialValue !== parseInt(val) && !(val === '' && initialValue === 0) && !(val === '-')) {
+      setVal(initialValue === 0 ? '' : initialValue.toString());
+    }
+  }, [initialValue]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    // Allow empty string, single minus sign, or valid integer
+    if (v === '' || v === '-' || /^-?\d*$/.test(v)) {
+      setVal(v);
+      const parsed = parseInt(v);
+      if (!isNaN(parsed)) {
+        onUpdate(parsed);
+      } else if (v === '' || v === '-') {
+        onUpdate(0);
+      }
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      className="fit-input-premium-inline"
+      style={{ width: '80px', textAlign: 'center' }}
+      value={val}
+      onChange={handleChange}
+      onBlur={() => {
+        if (val === '-' || val === '') {
+          setVal('0');
+          onUpdate(0);
+        }
+      }}
+      placeholder="0"
+    />
+  );
+};
+
 const LeaderView = ({
   group,
   teams,
   missions,
   approveMission,
+  rejectMission,
   addTeam,
   renameTeam,
   deleteTeam,
   addMember,
   removeMember,
   kickMember,
+  updateTeamPoints,
   allMembers,
-  onDeleteGroup
+  onDeleteGroup,
+  challenges
 }: {
   group: Group,
   teams: Team[],
   missions: Mission[],
   approveMission: (id: string) => void,
+  rejectMission: (id: string) => void,
   addTeam: () => void,
   renameTeam: (teamId: string, newName: string) => void,
   deleteTeam: (teamId: string) => void,
   addMember: (teamId: string, name: string) => void,
   removeMember: (teamId: string, name: string) => void,
   kickMember: (name: string) => void,
+  updateTeamPoints: (teamId: string, pts: number) => void,
   allMembers: string[],
-  onDeleteGroup: (id: string) => void
+  onDeleteGroup: (id: string) => void,
+  challenges: WeeklyChallenge[]
 }) => {
   const [adminTab, setAdminTab] = useState<'approval' | 'teams' | 'members'>('approval');
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
@@ -1855,24 +2150,6 @@ const LeaderView = ({
   const availableMembers = allMembers.filter(m => !assignedMembers.includes(m));
 
   // 실제 missions 데이터에서 멤버별 최신 기록을 동적으로 집계
-  const getMemberLatestRecord = (memberName: string): string => {
-    const memberMissions = missions
-      .filter(m => m.userName === memberName && m.status === 'approved' && m.groupId === group.id && m.records)
-      .sort((a, b) => {
-        // timestamp 기준 내림차순 (최신 먼저)
-        if (!a.timestamp || !b.timestamp) return 0;
-        return b.timestamp.localeCompare(a.timestamp);
-      });
-
-    if (memberMissions.length === 0) return '기록 없음';
-
-    const latest = memberMissions[0];
-    const entries = Object.entries(latest.records || {});
-    if (entries.length === 0) return '기록 없음';
-
-    // 최대 2개 항목만 표시 (ex: "1KM 03'45" / 5KM 21'10"")
-    return entries.slice(0, 2).map(([key, val]) => `${key} ${val}`).join(' / ');
-  };
 
   const handleStartRename = (teamId: string, name: string) => {
     setEditingTeamId(teamId);
@@ -1895,26 +2172,58 @@ const LeaderView = ({
 
           return (
             <div key={m.id} className="card admin-approve-card-v2 animate-fadeIn">
-              <div className="flex-between mb-20">
-                <div className="flex flex-col gap-4">
-                  <span className="text-green font-11 bold uppercase tracking-widest">{m.type}</span>
-                  <h3 className="text-white font-22 bold tracking-tight">
-                    {teamName} <span className="text-gray-400 font-18 ml-4">|</span> <span className="ml-4">{m.userName}</span>
-                  </h3>
-                </div>
-                <button className="btn-approve-v2 shrink-0" onClick={() => approveMission(m.id)}>
-                  <Check size={18} strokeWidth={3} />
-                  <span>승인하기</span>
-                </button>
+              <div className="flex flex-col gap-4 mb-20">
+                <span className="text-green font-11 bold uppercase tracking-widest">{m.type}</span>
+                <h3 className="text-white font-22 bold tracking-tight">
+                  {teamName} <span className="text-gray-400 font-18 ml-4">|</span> <span className="ml-4">{m.userName}</span>
+                </h3>
               </div>
 
               <div className="grid-horizontal-records mb-20">
-                {Object.entries(m.records || {}).map(([key, val]) => (
-                  <div key={key} className="record-display-item">
-                    <span className="text-gray-500 font-11 bold uppercase tracking-widest mb-4">{key}</span>
-                    <span className="text-white font-24 bold tracking-tighter">{String(val) || "00'00\""}</span>
-                  </div>
-                ))}
+                {(() => {
+                  const challenge = challenges.find(c => c.week === m.week);
+                  const mId = m.records?.missionId;
+                  let missionTitle = "";
+
+                  if (mId) {
+                    const field = challenge?.recordFields?.find(f => f.id === mId);
+                    if (field) missionTitle = field.label;
+                    else {
+                      // Fallback to WEEK1_STRUCTURE
+                      const allW1 = [...WEEK1_STRUCTURE.personal, ...WEEK1_STRUCTURE.strength, ...WEEK1_STRUCTURE.team];
+                      const w1Field = allW1.find(f => f.id === mId);
+                      if (w1Field) missionTitle = w1Field.title;
+                    }
+                  }
+
+                  const entries = Object.entries(m.records || {}).filter(([key, val]) => {
+                    const k = key.toLowerCase();
+                    if (k === 'missionid' || k === 'category') return false;
+                    if (val === "00'00\"" || val === "") return false;
+                    return true;
+                  });
+
+                  return (
+                    <>
+                      {missionTitle && (
+                        <div className="record-display-item full-width">
+                          <span className="text-gray-500 font-11 bold uppercase tracking-widest mb-4">선택 미션</span>
+                          <span className="text-white font-20 bold tracking-tight">{missionTitle}</span>
+                        </div>
+                      )}
+                      {entries.map(([key, val]) => {
+                        const displayKey = key.toLowerCase() === 'participantcount' ? '참가 인원' : key;
+                        const displayVal = key.toLowerCase() === 'participantcount' ? `${val}인` : String(val);
+                        return (
+                          <div className="record-display-item" key={key}>
+                            <span className="text-gray-500 font-11 bold uppercase tracking-widest mb-4">{displayKey}</span>
+                            <span className="text-white font-20 bold tracking-tight">{displayVal}</span>
+                          </div>
+                        );
+                      })}
+                    </>
+                  );
+                })()}
               </div>
 
               {m.images && m.images.length > 0 && (
@@ -1930,6 +2239,17 @@ const LeaderView = ({
                   </div>
                 </div>
               )}
+
+              <div className="flex gap-12 mt-24">
+                <button className="btn-reject-v2 flex-1" onClick={() => rejectMission(m.id)}>
+                  <X size={18} strokeWidth={3} />
+                  <span>미승인</span>
+                </button>
+                <button className="btn-approve-v2 flex-1" onClick={() => approveMission(m.id)}>
+                  <Check size={18} strokeWidth={3} />
+                  <span>승인하기</span>
+                </button>
+              </div>
             </div>
           );
         })}
@@ -2001,7 +2321,21 @@ const LeaderView = ({
               )}
             </div>
 
+            <div className="flex-between mb-16">
+              <div className="flex items-center gap-12">
+                <span className="text-gray-600 font-11 bold uppercase">Team Bonus Points</span>
+                <div className="flex items-center gap-4">
+                  <BonusPointsInput
+                    initialValue={t.bonusPoints || 0}
+                    onUpdate={(newPts) => updateTeamPoints(t.id, newPts)}
+                  />
+                  <span className="text-green font-11 bold">PTS</span>
+                </div>
+              </div>
+            </div>
+
             <div className="flex items-center gap-8 mb-20">
+
               <span className="text-gray-600 font-12 bold">{t.members.length}/4 명 참여 중</span>
               <div className="flex-1 h-3 bg-black rounded-full overflow-hidden border border-gray-900">
                 <div className="h-full bg-green transition-all" style={{ width: `${(t.members.length / 4) * 100}% ` }} />
@@ -2073,32 +2407,25 @@ const LeaderView = ({
         {allMembers.map((m: any) => {
           const memberTeam = groupTeams.find(t => t.members.includes(m));
           return (
-            <div key={m} className="card member-info-card-v2">
-              <div className="flex-between">
-                <div className="flex items-center gap-12">
-                  <div className="member-avatar-mini">{m.substring(0, 1)}</div>
-                  <div>
-                    <p className="text-white font-15 bold">{m}</p>
-                    <p className="text-gray-600 font-12 mt-2">
-                      {memberTeam ? <span>{memberTeam.name} 소속</span> : <span className="text-red-dim">미배정</span>}
-                    </p>
+            <div key={m} className="card member-info-card-v2 flex-between w-full">
+              <div className="flex items-center gap-12 min-w-0">
+                <div className="member-avatar-mini shrink-0">{m.substring(0, 1)}</div>
+                <div className="min-w-0">
+                  <p className="text-white font-15 bold truncate">{m}</p>
+                  <div className="mt-4">
+                    <span className={`font-10 bold px-6 py-2 rounded-4 ${memberTeam ? 'bg-white/5 text-gray-400' : 'bg-red-dim/10 text-red-dim'}`}>
+                      {memberTeam ? memberTeam.name : '미배정'}
+                    </span>
                   </div>
-                </div>
-                <div className="text-right flex items-center gap-12">
-                  <div className="text-right">
-                    <p className="text-green font-11 bold uppercase tracking-tighter">최근 기록</p>
-                    <p className="text-gray-300 font-12 mt-2">{getMemberLatestRecord(m)}</p>
-                  </div>
-                  <button
-                    className="btn-kick-member-v2"
-                    onClick={() => kickMember(m)}
-                  >
-                    <span>내보내기</span>
-                  </button>
-
-
                 </div>
               </div>
+
+              <button
+                className="btn-kick-member-v2-sm shrink-0"
+                onClick={() => kickMember(m)}
+              >
+                내보내기
+              </button>
             </div>
           );
         })}
@@ -2282,6 +2609,22 @@ const App: React.FC = () => {
             pbs: profile.pbs || { '1KM': "00'00\"", '3KM': "00'00\"", '5KM': "00'00\"", '10KM': "00'00\"" }
           });
         }
+      } else {
+        // Profile not found in database - likely a stale session from another DB
+        console.warn("Profile not found in database. Logging out stale session.");
+        setProfileId(null);
+        setUserInfo({
+          name: '',
+          statusMessage: '러닝 열정 폭발 🔥',
+          profilePic: null,
+          monthlyDistance: '0',
+          monthlyGoal: '100',
+          lastUpdatedMonth: new Date().getMonth() + 1,
+          pbs: { '1KM': "00'00\"", '3KM': "00'00\"", '5KM': "00'00\"", '10KM': "00'00\"" }
+        });
+        localStorage.clear();
+        setLoading(false);
+        return;
       }
 
       // 4. Load initial group data if applicable
@@ -2295,10 +2638,11 @@ const App: React.FC = () => {
         setViewMode('group');
 
         // Parallel load for group specific data
-        const [teamList, membersList, missionList] = await Promise.all([
+        const [teamList, membersList, missionList, challengeList] = await Promise.all([
           db.getTeamsByGroup(firstGroup.id),
           db.getGroupMembers(firstGroup.id),
-          db.getMissionsByGroup(firstGroup.id)
+          db.getMissionsByGroup(firstGroup.id),
+          db.getChallenges()
         ]);
 
         setTeams(teamList);
@@ -2306,6 +2650,7 @@ const App: React.FC = () => {
         setUserTeamId(myTeam ? myTeam.id : null);
         setGroupMembers(membersList.map((m: any) => m.nickname));
         setMissions(missionList);
+        setChallenges(challengeList);
       } else {
         const indMissions = await db.getIndividualMissions(pId);
         setMissions(indMissions);
@@ -2343,14 +2688,16 @@ const App: React.FC = () => {
   // Reload group data when switching groups
   const loadGroupData = React.useCallback(async (groupId: string) => {
     try {
-      const [teamList, members, missionList] = await Promise.all([
+      const [teamList, members, missionList, challengeList] = await Promise.all([
         db.getTeamsByGroup(groupId),
         db.getGroupMembers(groupId),
-        db.getMissionsByGroup(groupId)
+        db.getMissionsByGroup(groupId),
+        db.getChallenges()
       ]);
       setTeams(teamList);
       setGroupMembers(members.map((m: any) => m.nickname));
       setMissions(missionList);
+      setChallenges(challengeList);
     } catch (e) {
       console.error('Failed to load group data:', e);
     }
@@ -2361,8 +2708,22 @@ const App: React.FC = () => {
   // ============================================
   const addChallenge = async () => {
     const nextWeek = challenges.length > 0 ? Math.max(...challenges.map((c: any) => c.week)) + 1 : 1;
+    let title = '새로운 훈련';
+    let desc = '훈련 내용을 입력해주세요.';
+    let fields: any[] = [];
+
+    if (nextWeek === 1) {
+      title = '베이스 스트렝스 만들기!';
+      desc = '1주차 미션\n\n개인 : 미션 2가지 수행 완료시 7점 / 1가지 완료시 3점\n스트렝스 : 미션 3가지 수동 완료시 10점\n팀 : 미션 45/20/4점';
+      fields = [
+        ...WEEK1_STRUCTURE.personal.map(f => ({ id: f.id, label: f.title, sub: f.sub, category: 'personal' as const })),
+        ...WEEK1_STRUCTURE.strength.map(f => ({ id: f.id, label: f.title, sub: f.sub, category: 'strength' as const })),
+        ...WEEK1_STRUCTURE.team.map(f => ({ id: f.id, label: f.title, sub: f.sub, category: 'team' as const }))
+      ];
+    }
+
     try {
-      const created = await db.addChallengeDB(nextWeek, '새로운 훈련', '훈련 내용을 입력해주세요.');
+      const created = await db.addChallengeDB(nextWeek, title, desc, fields);
       setChallenges(prev => [...prev, { id: created.id, week: created.week, title: created.title, description: created.description, recordFields: created.record_fields || [] }]);
     } catch (e) {
       console.error('Failed to add challenge:', e);
@@ -2406,6 +2767,17 @@ const App: React.FC = () => {
       // 2. 기본 팀 생성
       const team = await db.createTeam(group.id, `${name} 01팀`);
 
+      // 2.1 1주차 기본 챌린지 생성
+      const w1Fields = [
+        ...WEEK1_STRUCTURE.personal.map(f => ({ id: f.id, label: f.title, sub: f.sub, category: 'personal' as const })),
+        ...WEEK1_STRUCTURE.strength.map(f => ({ id: f.id, label: f.title, sub: f.sub, category: 'strength' as const })),
+        ...WEEK1_STRUCTURE.team.map(f => ({ id: f.id, label: f.title, sub: f.sub, category: 'team' as const }))
+      ];
+      const w1Title = '베이스 스트렝스 만들기!';
+      const w1Desc = '1주차 미션\n\n개인 : 미션 2가지 수행 완료시 7점 / 1가지 완료시 3점\n스트렝스 : 미션 3가지 수동 완료시 10점\n팀 : 미션 45/20/4점';
+      const w1Challenge = await db.addChallengeDB(1, w1Title, w1Desc, w1Fields);
+      setChallenges([{ id: w1Challenge.id, week: 1, title: w1Title, description: w1Desc, recordFields: w1Fields }]);
+
       // 3. 팀 멤버 추가
       await db.addTeamMember(team.id, profileId);
 
@@ -2427,7 +2799,8 @@ const App: React.FC = () => {
         id: team.id,
         groupId: group.id,
         name: `${name} 01팀`,
-        members: [userInfo.name]
+        members: [userInfo.name],
+        bonusPoints: 0
       }]);
       setUserTeamId(team.id);
       setGroupMembers([userInfo.name]);
@@ -2831,6 +3204,15 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateTeamPoints = async (teamId: string, pts: number) => {
+    setTeams((prev: any) => prev.map((t: any) => t.id === teamId ? { ...t, bonusPoints: pts } : t));
+    try {
+      await db.updateTeamPoints(teamId, pts);
+    } catch (e) {
+      console.error('Failed to update team points:', e);
+    }
+  };
+
   const deleteGroup = async (id: string) => {
     setGroups((prev: any) => prev.filter((g: any) => g.id !== id));
     setTeams((prev: any) => prev.filter((t: any) => t.groupId !== id));
@@ -2914,7 +3296,19 @@ const App: React.FC = () => {
       />
     );
 
-    if (isInputView) return <MissionInputView onBack={() => setIsInputView(false)} onSubmit={submitMissionHandler} isGroup={viewMode === 'group'} challenge={challenges.find(c => c.week === currentPeriod)} />;
+    if (isInputView) return (
+      <MissionInputView
+        onBack={() => setIsInputView(false)}
+        onSubmit={submitMissionHandler}
+        onToast={showToast}
+        isGroup={viewMode === 'group'}
+        challenge={challenges.find(c => c.week === (editingMission?.week || currentPeriod))}
+        initialMission={editingMission || undefined}
+        currentWeek={editingMission?.week || currentPeriod}
+        missions={missions}
+        currentUserName={userInfo.name}
+      />
+    );
 
     const isGroupCtx = viewMode === 'group' && userGroupId;
     switch (activeTab) {
@@ -2946,10 +3340,11 @@ const App: React.FC = () => {
             onComment={addCommentHandler}
             onDeleteMission={deleteMission}
             onDeleteComment={deleteCommentHandler}
+            challenges={challenges}
           />
         );
 
-      case 'ranking': return <RankingView currentGroupId={isGroupCtx ? userGroupId : null} userInfo={userInfo} teams={teams} missions={missions} groups={groups} myGroupIds={myGroupIds} />;
+      case 'ranking': return <RankingView currentGroupId={isGroupCtx ? userGroupId : null} userInfo={userInfo} teams={teams} missions={missions} groups={groups} myGroupIds={myGroupIds} challenges={challenges} />;
       case 'profile': return (
         <ProfileView
           team={isGroupCtx ? currentTeam || null : null}
@@ -2992,14 +3387,17 @@ const App: React.FC = () => {
           teams={teams}
           missions={missions}
           approveMission={approveMission}
+          rejectMission={deleteMission}
           addTeam={addTeam}
           renameTeam={renameTeam}
           deleteTeam={deleteTeam}
           addMember={addMember}
           removeMember={removeMember}
           kickMember={kickMember}
+          updateTeamPoints={handleUpdateTeamPoints}
           allMembers={groupMembers}
           onDeleteGroup={deleteGroup}
+          challenges={challenges}
         />
       ) : <div className="empty-state-fit py-100 flex-center flex-col"><Shield size={48} className="text-gray-800 mb-16" /><p className="text-gray">그룹에 가입되어 있지 않습니다.</p><button className="btn-primary mt-20" onClick={() => setShowOnboarding(true)}>그룹 가입/생성하기</button></div>;
       default: return <HomeView group={isGroupCtx ? currentGroup || null : null} allGroups={groups} team={isGroupCtx ? currentTeam || null : null} missions={missions} userInfo={userInfo} onStartInput={() => setIsInputView(true)} currentWeek={currentPeriod} challenges={challenges} />;

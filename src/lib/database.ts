@@ -171,9 +171,15 @@ export async function getTeamsByGroup(groupId: string) {
         id: t.id,
         groupId: t.group_id,
         name: t.name,
+        bonusPoints: t.bonus_points || 0,
         members: (t.team_members || []).map((tm: any) => tm.profiles?.nickname).filter(Boolean)
     }));
 }
+
+export async function updateTeamPoints(teamId: string, bonusPoints: number) {
+    await supabase.from('teams').update({ bonus_points: bonusPoints }).eq('id', teamId);
+}
+
 
 export async function createTeam(groupId: string, name: string) {
     const { data, error } = await supabase
@@ -380,10 +386,10 @@ export async function getChallenges() {
     }));
 }
 
-export async function addChallengeDB(week: number, title: string, description: string) {
+export async function addChallengeDB(week: number, title: string, description: string, recordFields?: any[]) {
     const { data, error } = await supabase
         .from('challenges')
-        .insert({ week, title, description })
+        .insert({ week, title, description, record_fields: recordFields || [] })
         .select()
         .single();
     if (error) throw error;
