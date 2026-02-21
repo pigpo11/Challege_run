@@ -30,6 +30,17 @@ export async function getAllUserNames(): Promise<string[]> {
     return (data || []).map((p: any) => p.nickname);
 }
 
+export async function getAllUserProfiles() {
+    const { data } = await supabase
+        .from('profiles')
+        .select('nickname, profile_pic, status_message');
+    return (data || []).map((p: any) => ({
+        userName: p.nickname,
+        profilePic: p.profile_pic,
+        statusMessage: p.status_message
+    }));
+}
+
 export async function updateProfile(profileId: string, updates: Record<string, any>) {
     const { data, error } = await supabase
         .from('profiles')

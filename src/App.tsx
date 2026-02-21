@@ -782,6 +782,7 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
 const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGroupIds, challenges, groupMembers, allUserNames, groupMemberMappings }: { currentGroupId: string | null, userInfo: any, teams: Team[], missions: Mission[], groups: Group[], myGroupIds: string[], challenges: WeeklyChallenge[], groupMembers: string[], allUserNames: string[], groupMemberMappings: any[] }) => {
   const [rankTab, setRankTab] = useState<'team' | 'individual'>('team');
   const [displayGroupIdx, setDisplayGroupIdx] = useState(0);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
   const isGroupMode = !!currentGroupId;
   const currentMonth = new Date().getMonth() + 1;
@@ -869,8 +870,13 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGrou
     <div key={i} className={`ranking-row-v2 ${p.isMe ? 'active-user-row' : ''}`}>
       <div className="rank-num-v2">{i + 1}</div>
       <div className="avatar-v2-wrap">
-        {p.pic ? (
-          <img src={p.pic} alt={p.name} className="avatar-v2" />
+        {p.pic && !failedImages.has(p.name) ? (
+          <img
+            src={p.pic}
+            alt={p.name}
+            className="avatar-v2"
+            onError={() => setFailedImages(prev => new Set(prev).add(p.name))}
+          />
         ) : (
           <div className="avatar-v2-placeholder">{p.name.substring(0, 1)}</div>
         )}
@@ -1019,6 +1025,7 @@ const ProfileView = ({
   const [editStatus, setEditStatus] = useState(userInfo.statusMessage);
   const [editPic, setEditPic] = useState<string | null>(userInfo.profilePic);
   const [editGoal, setEditGoal] = useState(userInfo.monthlyGoal);
+  const [isProfilePicBroken, setIsProfilePicBroken] = useState(false);
 
   const picInputRef = useRef<HTMLInputElement>(null);
 
@@ -1084,8 +1091,8 @@ const ProfileView = ({
             <div className="flex-center flex-col mb-24">
               <div className="profile-pic-uploader" onClick={handlePicUpload}>
                 <input type="file" ref={picInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-                {editPic ? (
-                  <img src={editPic} alt="Profile" className="profile-pic-preview" />
+                {editPic && !isProfilePicBroken ? (
+                  <img src={editPic} alt="Profile" className="profile-pic-preview" onError={() => setIsProfilePicBroken(true)} />
                 ) : (
                   <div className="profile-pic-placeholder">
                     <User size={32} color="#636366" />
@@ -1146,8 +1153,8 @@ const ProfileView = ({
           <div className="profile-row-ref">
             <div className="profile-row-left" onClick={() => setIsEditing(true)}>
               <div className="avatar-ref">
-                {userInfo.profilePic ? (
-                  <img src={userInfo.profilePic} alt="Profile" className="avatar-ref-img" />
+                {userInfo.profilePic && !isProfilePicBroken ? (
+                  <img src={userInfo.profilePic} alt="Profile" className="avatar-ref-img" onError={() => setIsProfilePicBroken(true)} />
                 ) : (
                   <div className="avatar-ref-placeholder">
                     <User size={28} color="#555" />
@@ -1790,7 +1797,7 @@ const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initi
   );
 };
 
-const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComment, onDeleteMission, onDeleteComment, challenges }: {
+const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComment, onDeleteMission, onDeleteComment, challenges, groupMemberMappings }: {
   mission: Mission,
   currentUserName: string,
   userRole: string,
@@ -1799,14 +1806,18 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
   onComment: (id: string, text: string) => void,
   onDeleteMission?: (id: string) => void,
   onDeleteComment?: (mId: string, cId: string) => void,
-  challenges: WeeklyChallenge[]
+  challenges: WeeklyChallenge[],
+  groupMemberMappings?: any[]
 }) => {
   const [commentText, setCommentText] = useState('');
+  const [isAvatarBroken, setIsAvatarBroken] = useState(false);
   const isLiked = mission.likedBy.includes(currentUserName);
   const isAdmin = userRole === 'leader';
   const isAuthor = mission.userName === currentUserName;
 
   const authorTeam = teams.find(t => t.id === mission.teamId) || teams.find(t => t.members.includes(mission.userName));
+  const authorProfile = groupMemberMappings?.find(m => m.userName === mission.userName);
+  const profilePic = authorProfile?.profilePic;
 
   const challenge = challenges.find(c => c.week === mission.week);
   const missionId = mission.records?.missionId;
@@ -1844,7 +1855,13 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
     <div className="mission-card-premium">
       <div className="mission-card-header flex-between">
         <div className="flex items-center gap-12">
-          <div className="mission-user-avatar">{mission.userName.substring(0, 1)}</div>
+          <div className="mission-user-avatar">
+            {profilePic && !isAvatarBroken ? (
+              <img src={profilePic} alt={mission.userName} className="w-full h-full object-cover rounded-full" onError={() => setIsAvatarBroken(true)} />
+            ) : (
+              mission.userName.substring(0, 1)
+            )}
+          </div>
           <div className="mission-user-info">
             <div className="flex items-center gap-6">
               <p className="name">{mission.userName}</p>
@@ -1934,7 +1951,8 @@ const WeeklyFeedView = ({
   onComment,
   onDeleteMission,
   onDeleteComment,
-  challenges
+  challenges,
+  groupMemberMappings
 }: {
   week: number | null,
   missions: Mission[],
@@ -1945,7 +1963,8 @@ const WeeklyFeedView = ({
   onComment: (id: string, text: string) => void,
   onDeleteMission?: (id: string) => void,
   onDeleteComment?: (mId: string, cId: string) => void,
-  challenges: WeeklyChallenge[]
+  challenges: WeeklyChallenge[],
+  groupMemberMappings: any[]
 }) => {
   return (
     <div className="page-container flex flex-col h-full bg-black">
@@ -1968,6 +1987,7 @@ const WeeklyFeedView = ({
                 onDeleteMission={onDeleteMission}
                 onDeleteComment={onDeleteComment}
                 challenges={challenges}
+                groupMemberMappings={groupMemberMappings}
               />
 
             ))}
@@ -2690,12 +2710,12 @@ const App: React.FC = () => {
   const loadUserData = React.useCallback(async (pId: string, nickname: string) => {
     try {
       // Use Promise.all for parallel loading
-      const [myGroups, challengeList, profile, allSystemGroups, allMappings] = await Promise.all([
+      const [myGroups, challengeList, profile, allSystemGroups, allProfiles] = await Promise.all([
         db.getMyGroups(pId),
         db.getChallenges(),
         db.getFullProfile(pId),
         db.getAllGroups(),
-        db.getAllGroupMembers()
+        db.getAllUserProfiles()
       ]);
 
       // 1. Process Groups
@@ -2713,7 +2733,7 @@ const App: React.FC = () => {
       // 2. Process Challenges
       setChallenges(challengeList);
       setAllGroupsState(allSystemGroups);
-      setGroupMemberMappings(allMappings);
+      setGroupMemberMappings(allProfiles);
 
       // 3. Process Profile & Refresh dependencies
       if (profile) {
@@ -3534,6 +3554,7 @@ const App: React.FC = () => {
             onDeleteMission={deleteMission}
             onDeleteComment={deleteCommentHandler}
             challenges={challenges}
+            groupMemberMappings={groupMemberMappings}
           />
         );
 
