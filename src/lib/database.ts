@@ -484,3 +484,25 @@ export async function uploadFile(file: File): Promise<string> {
 
     return data.publicUrl;
 }
+
+export async function getAllGroups() {
+    const { data } = await supabase.from('groups').select('*');
+    return (data || []).map((g: any) => ({
+        id: g.id,
+        name: g.name,
+        leaderId: g.leader_id,
+        inviteCode: g.invite_code,
+        totalScore: g.total_score || 0,
+        totalDistance: Number(g.total_distance) || 0
+    }));
+}
+
+export async function getAllGroupMembers() {
+    const { data } = await supabase
+        .from('group_members')
+        .select('group_id, profiles(nickname)');
+    return (data || []).map((gm: any) => ({
+        groupId: gm.group_id,
+        userName: gm.profiles?.nickname
+    })).filter(gm => gm.userName);
+}

@@ -468,7 +468,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
   );
 };
 
-const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, currentWeek, challenges }: { group: Group | null, allGroups: Group[], team: Team | null, missions: Mission[], userInfo: any, onStartInput: () => void, currentWeek: number, challenges: WeeklyChallenge[] }) => {
+const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userInfo, onStartInput, currentWeek, challenges }: { group: Group | null, allGroups: Group[], groupMemberMappings: { groupId: string, userName: string }[], team: Team | null, missions: Mission[], userInfo: any, onStartInput: () => void, currentWeek: number, challenges: WeeklyChallenge[] }) => {
   const myMissions = missions.filter(m => (team ? m.teamId === team.id : !m.teamId) && m.week === currentWeek && m.userName === userInfo.name);
   const currentChallenge = challenges.find(c => c.week === currentWeek);
 
@@ -478,8 +478,27 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
   const myPoints = calculatePoints(missions, userInfo.name, challenges);
   const teamPoints = team ? (team.members.reduce((sum, name) => sum + calculatePoints(missions, name, challenges), 0) + (team.bonusPoints || 0)) : 0;
 
-  const sortedGroupsByDistance = [...allGroups].sort((a, b) => (b.totalDistance || 0) - (a.totalDistance || 0));
+  const currentMonth = new Date().getMonth() + 1;
+  const currentYear = new Date().getFullYear();
+  const currentMonthMissions = missions.filter(m => {
+    const d = new Date(m.timestamp || new Date());
+    return (d.getMonth() + 1) === currentMonth && d.getFullYear() === currentYear;
+  });
+
+  const sortedGroupsByDistance = [...allGroups].map(g => {
+    // Get all members for this group
+    const memberNames = groupMemberMappings.filter(gm => gm.groupId === g.id).map(gm => gm.userName);
+
+    // Sum distance of all these members in the current month
+    const monthlyDist = currentMonthMissions
+      .filter(m => memberNames.includes(m.userName) && (m.status === 'approved' || m.type === '개인 러닝'))
+      .reduce((sum, m) => sum + (m.distance || 0), 0);
+
+    return { ...g, monthlyDistance: monthlyDist };
+  }).sort((a, b) => b.monthlyDistance - a.monthlyDistance);
+
   const myGroupRank = group ? sortedGroupsByDistance.findIndex(g => g.id === group.id) + 1 : null;
+  const myGroupData = group ? sortedGroupsByDistance.find(g => g.id === group.id) : null;
 
   return (
     <div className="page-container">
@@ -545,11 +564,11 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
           </div>
 
           <div className="group-mini-ranking mt-12">
-            {(sortedGroupsByDistance as Group[]).slice(0, 10).map((g: Group, i: number) => (
+            {(sortedGroupsByDistance as any[]).slice(0, 10).map((g: any, i: number) => (
               <div key={g.id} className="mini-rank-item">
                 <span className="rank-num">{i + 1}</span>
                 <span className="group-name">{g.name}</span>
-                <span className="group-score">{(g.totalDistance || 0).toLocaleString()} km</span>
+                <span className="group-score">{(g.monthlyDistance || 0).toLocaleString()} km</span>
               </div>
             ))}
           </div>
@@ -682,20 +701,20 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
           </div>
 
           <div className="group-mini-ranking mt-12">
-            {(sortedGroupsByDistance as Group[]).slice(0, 5).map((g: Group, i: number) => (
+            {(sortedGroupsByDistance as any[]).slice(0, 5).map((g: any, i: number) => (
               <div key={g.id} className={`mini-rank-item ${group && g.id === group.id ? 'active' : ''}`}>
                 <span className="rank-num">{i + 1}</span>
                 <span className="group-name">{g.name}</span>
-                <span className="group-score">{(g.totalDistance || 0).toLocaleString()} km</span>
+                <span className="group-score">{(g.monthlyDistance || 0).toLocaleString()} km</span>
               </div>
             ))}
-            {group && myGroupRank && myGroupRank > 5 && (
+            {group && myGroupRank && myGroupRank > 5 && myGroupData && (
               <>
                 <div className="rank-divider my-8 border-t border-gray-800" />
                 <div className="mini-rank-item active">
                   <span className="rank-num">{myGroupRank}</span>
                   <span className="group-name">{group.name}</span>
-                  <span className="group-score">{(group.totalDistance || 0).toLocaleString()} km</span>
+                  <span className="group-score">{(myGroupData.monthlyDistance || 0).toLocaleString()} km</span>
                 </div>
               </>
             )}
@@ -760,7 +779,7 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
   );
 };
 
-const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGroupIds, challenges, myTeamId, groupMembers, allUserNames }: { currentGroupId: string | null, userInfo: any, teams: Team[], missions: Mission[], groups: Group[], myGroupIds: string[], challenges: WeeklyChallenge[], myTeamId: string | null, groupMembers: string[], allUserNames: string[] }) => {
+const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGroupIds, challenges, groupMembers, allUserNames }: { currentGroupId: string | null, userInfo: any, teams: Team[], missions: Mission[], groups: Group[], myGroupIds: string[], challenges: WeeklyChallenge[], groupMembers: string[], allUserNames: string[] }) => {
   const [rankTab, setRankTab] = useState<'team' | 'individual'>('team');
   const [displayGroupIdx, setDisplayGroupIdx] = useState(0);
 
@@ -804,8 +823,17 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGrou
   let monthUserNames: string[] = [];
 
   if (isGroupMode) {
-    // 1. Group Mode: Show only members of THIS group
-    monthUserNames = [...groupMembers];
+    // 1. Group Mode: Show everyone in this group
+    // We combine members from all teams in this group AND the groupMembers list for robustness
+    const membersFromTeams = teams
+      .filter(t => t.groupId === currentGroupId)
+      .flatMap(t => t.members);
+
+    const membersFromMissions = currentMonthMissions
+      .filter(m => m.groupId === currentGroupId)
+      .map(m => m.userName);
+
+    monthUserNames = Array.from(new Set([...membersFromTeams, ...groupMembers, ...membersFromMissions]));
   } else {
     // 2. Individual Mode: Show all valid members (exclude deleted traces)
     // Only show names that exist in allUserNames to handle deleted users like 'ㅎㅇ'
@@ -2650,6 +2678,8 @@ const App: React.FC = () => {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [groupMembers, setGroupMembers] = useState<string[]>([]);
   const [challenges, setChallenges] = useState<WeeklyChallenge[]>([]);
+  const [allGroupsState, setAllGroupsState] = useState<Group[]>([]);
+  const [groupMemberMappings, setGroupMemberMappings] = useState<{ groupId: string, userName: string }[]>([]);
 
   // ============================================
   // Load data from Supabase on mount / login
@@ -2657,10 +2687,12 @@ const App: React.FC = () => {
   const loadUserData = React.useCallback(async (pId: string, nickname: string) => {
     try {
       // Use Promise.all for parallel loading
-      const [myGroups, challengeList, profile] = await Promise.all([
+      const [myGroups, challengeList, profile, allSystemGroups, allMappings] = await Promise.all([
         db.getMyGroups(pId),
         db.getChallenges(),
-        db.getFullProfile(pId)
+        db.getFullProfile(pId),
+        db.getAllGroups(),
+        db.getAllGroupMembers()
       ]);
 
       // 1. Process Groups
@@ -2677,6 +2709,8 @@ const App: React.FC = () => {
 
       // 2. Process Challenges
       setChallenges(challengeList);
+      setAllGroupsState(allSystemGroups);
+      setGroupMemberMappings(allMappings);
 
       // 3. Process Profile & Refresh dependencies
       if (profile) {
@@ -2790,19 +2824,22 @@ const App: React.FC = () => {
     db.getAllUserNames().then(names => setAllUserNames(names)).catch(console.error);
   }, []);
 
-  // Reload group data when switching groups
   const loadGroupData = React.useCallback(async (groupId: string) => {
     try {
-      const [teamList, members, missionList, challengeList] = await Promise.all([
+      const [teamList, members, missionList, challengeList, allSystemGroups, allMappings] = await Promise.all([
         db.getTeamsByGroup(groupId),
         db.getGroupMembers(groupId),
         db.getAllMissions(), // Fetch all to include individual records for ranking
-        db.getChallenges()
+        db.getChallenges(),
+        db.getAllGroups(),
+        db.getAllGroupMembers()
       ]);
       setTeams(teamList);
       setGroupMembers(members.map((m: any) => m.nickname));
       setMissions(missionList);
       setChallenges(challengeList);
+      setAllGroupsState(allSystemGroups);
+      setGroupMemberMappings(allMappings);
     } catch (e) {
       console.error('Failed to load group data:', e);
     }
@@ -3455,7 +3492,17 @@ const App: React.FC = () => {
 
     const isGroupCtx = viewMode === 'group' && userGroupId;
     switch (activeTab) {
-      case 'home': return <HomeView group={isGroupCtx ? currentGroup || null : null} allGroups={groups} team={isGroupCtx ? currentTeam || null : null} missions={missions} userInfo={userInfo} onStartInput={() => setIsInputView(true)} currentWeek={currentPeriod} challenges={challenges} />;
+      case 'home': return <HomeView
+        group={isGroupCtx ? currentGroup || null : null}
+        allGroups={allGroupsState}
+        groupMemberMappings={groupMemberMappings}
+        team={isGroupCtx ? currentTeam || null : null}
+        missions={missions}
+        userInfo={userInfo}
+        onStartInput={() => setIsInputView(true)}
+        currentWeek={currentPeriod}
+        challenges={challenges}
+      />;
       case 'challenge':
         return (
           <ChallengeView
@@ -3495,7 +3542,6 @@ const App: React.FC = () => {
         groups={groups}
         myGroupIds={myGroupIds}
         challenges={challenges}
-        myTeamId={userTeamId}
         groupMembers={groupMembers}
         allUserNames={allUserNames}
       />;
@@ -3553,7 +3599,17 @@ const App: React.FC = () => {
           challenges={challenges}
         />
       ) : <div className="empty-state-fit py-100 flex-center flex-col"><Shield size={48} className="text-gray-800 mb-16" /><p className="text-gray">그룹에 가입되어 있지 않습니다.</p><button className="btn-primary mt-20" onClick={() => setShowOnboarding(true)}>그룹 가입/생성하기</button></div>;
-      default: return <HomeView group={isGroupCtx ? currentGroup || null : null} allGroups={groups} team={isGroupCtx ? currentTeam || null : null} missions={missions} userInfo={userInfo} onStartInput={() => setIsInputView(true)} currentWeek={currentPeriod} challenges={challenges} />;
+      default: return <HomeView
+        group={isGroupCtx ? currentGroup || null : null}
+        allGroups={allGroupsState}
+        groupMemberMappings={groupMemberMappings}
+        team={isGroupCtx ? currentTeam || null : null}
+        missions={missions}
+        userInfo={userInfo}
+        onStartInput={() => setIsInputView(true)}
+        currentWeek={currentPeriod}
+        challenges={challenges}
+      />;
     }
   };
 
