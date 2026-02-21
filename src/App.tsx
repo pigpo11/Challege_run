@@ -2792,7 +2792,7 @@ const App: React.FC = () => {
       const [teamList, members, missionList, challengeList] = await Promise.all([
         db.getTeamsByGroup(groupId),
         db.getGroupMembers(groupId),
-        db.getMissionsByGroup(groupId),
+        db.getAllMissions(), // Fetch all to include individual records for ranking
         db.getChallenges()
       ]);
       setTeams(teamList);
