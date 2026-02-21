@@ -254,6 +254,35 @@ export async function getMissionsByGroup(groupId: string) {
     }));
 }
 
+export async function getAllMissions() {
+    const { data } = await supabase
+        .from('missions')
+        .select('*, comments(*)')
+        .order('created_at', { ascending: false });
+
+    return (data || []).map((m: any) => ({
+        id: m.id,
+        groupId: m.group_id,
+        teamId: m.team_id,
+        profileId: m.profile_id,
+        userName: m.user_name,
+        week: m.week,
+        type: m.type,
+        status: m.status,
+        records: m.records || {},
+        distance: Number(m.distance) || 0,
+        images: m.images || [],
+        likedBy: m.liked_by || [],
+        timestamp: m.created_at,
+        comments: (m.comments || []).map((c: any) => ({
+            id: c.id,
+            userName: c.user_name,
+            text: c.text,
+            timestamp: c.created_at
+        }))
+    }));
+}
+
 export async function getIndividualMissions(profileId: string) {
     const { data } = await supabase
         .from('missions')

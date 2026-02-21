@@ -760,7 +760,7 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
   );
 };
 
-const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGroupIds, challenges }: { currentGroupId: string | null, userInfo: any, teams: Team[], missions: Mission[], groups: Group[], myGroupIds: string[], challenges: WeeklyChallenge[] }) => {
+const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGroupIds, challenges, myTeamId }: { currentGroupId: string | null, userInfo: any, teams: Team[], missions: Mission[], groups: Group[], myGroupIds: string[], challenges: WeeklyChallenge[], myTeamId: string | null }) => {
   const [rankTab, setRankTab] = useState<'team' | 'individual'>('team');
   const [displayGroupIdx, setDisplayGroupIdx] = useState(0);
 
@@ -799,21 +799,40 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGrou
     }).sort((a, b) => b.pts - a.pts)
     : [];
 
-  // Individual rankings within group or global (this month only)
-  const individualRankings = [
-    {
-      name: userInfo.name,
-      distance: currentMonthMissions
-        .filter(m => m.userName === userInfo.name && m.status === 'approved')
-        .reduce((sum, m) => sum + (m.distance || 0), 0),
-      displayTag: isGroupMode
-        ? (teams.find(t => t.members.includes(userInfo.name))?.name || '-')
-        : getDisplayGroupName(),
-      pic: userInfo.profilePic,
-      isMe: true,
-      status: userInfo.statusMessage
+  // Individual rankings (this month only)
+  // Get all unique users who have missions this month
+  let monthUserNames = Array.from(new Set(currentMonthMissions.map(m => m.userName)));
+  if (!monthUserNames.includes(userInfo.name)) monthUserNames.push(userInfo.name);
+
+  // If in Group Mode / Individual Tab -> Filter by current user's team ONLY
+  if (isGroupMode && rankTab === 'individual' && myTeamId) {
+    const activeTeam = teams.find(t => t.id === myTeamId);
+    if (activeTeam) {
+      monthUserNames = monthUserNames.filter(name => activeTeam.members.includes(name));
+      // Ensure all team members are present even if they have 0 distance this month
+      activeTeam.members.forEach(mName => {
+        if (!monthUserNames.includes(mName)) monthUserNames.push(mName);
+      });
     }
-  ];
+  }
+
+  const individualRankings = monthUserNames.map(name => {
+    const isMe = name === userInfo.name;
+    const distance = currentMonthMissions
+      .filter(m => m.userName === name && (m.status === 'approved' || m.type === '개인 러닝'))
+      .reduce((sum, m) => sum + (m.distance || 0), 0);
+
+    return {
+      name,
+      distance,
+      displayTag: isGroupMode
+        ? (teams.find(t => t.members.includes(name))?.name || '-')
+        : (isMe ? getDisplayGroupName() : '-'),
+      pic: isMe ? userInfo.profilePic : null,
+      isMe,
+      status: isMe ? userInfo.statusMessage : ''
+    };
+  }).sort((a, b) => b.distance - a.distance);
 
   const renderPersonRow = (p: any, i: number) => (
     <div key={i} className={`ranking-row-v2 ${p.isMe ? 'active-user-row' : ''}`}>
@@ -2734,6 +2753,9 @@ const App: React.FC = () => {
         const indMissions = await db.getIndividualMissions(pId);
         setMissions(indMissions);
       }
+      // 3. Process Missions (Show all missions in individual mode for global ranking)
+      const allMissionList = await db.getAllMissions();
+      setMissions(allMissionList);
 
     } catch (e) {
       console.error('Data Loading Error:', e);
@@ -3461,7 +3483,7 @@ const App: React.FC = () => {
           />
         );
 
-      case 'ranking': return <RankingView currentGroupId={isGroupCtx ? userGroupId : null} userInfo={userInfo} teams={teams} missions={missions} groups={groups} myGroupIds={myGroupIds} challenges={challenges} />;
+      case 'ranking': return <RankingView currentGroupId={isGroupCtx ? userGroupId : null} userInfo={userInfo} teams={teams} missions={missions} groups={groups} myGroupIds={myGroupIds} challenges={challenges} myTeamId={userTeamId} />;
       case 'profile': return (
         <ProfileView
           missions={missions}
