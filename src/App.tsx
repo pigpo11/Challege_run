@@ -3100,7 +3100,7 @@ const App: React.FC = () => {
         userName: userInfo.name,
         week: currentPeriod,
         type: isIndividual ? '개인 러닝' : '챌린지 인증',
-        status: isIndividual ? 'none' : 'pending',
+        status: isIndividual ? 'approved' : 'pending',
         records,
         distance: addedDist,
         images: uploadedPhotos
