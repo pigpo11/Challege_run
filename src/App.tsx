@@ -779,7 +779,7 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
   );
 };
 
-const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGroupIds, challenges, groupMembers, allUserNames }: { currentGroupId: string | null, userInfo: any, teams: Team[], missions: Mission[], groups: Group[], myGroupIds: string[], challenges: WeeklyChallenge[], groupMembers: string[], allUserNames: string[] }) => {
+const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGroupIds, challenges, groupMembers, allUserNames, groupMemberMappings }: { currentGroupId: string | null, userInfo: any, teams: Team[], missions: Mission[], groups: Group[], myGroupIds: string[], challenges: WeeklyChallenge[], groupMembers: string[], allUserNames: string[], groupMemberMappings: any[] }) => {
   const [rankTab, setRankTab] = useState<'team' | 'individual'>('team');
   const [displayGroupIdx, setDisplayGroupIdx] = useState(0);
 
@@ -850,15 +850,18 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGrou
       .filter(m => m.userName === name && (m.status === 'approved' || m.type === '개인 러닝'))
       .reduce((sum, m) => sum + (m.distance || 0), 0);
 
+    // Find profile info from mappings for pic/status
+    const profileInfo = groupMemberMappings.find(m => m.userName === name);
+
     return {
       name,
       distance,
       displayTag: isGroupMode
         ? (teams.find(t => t.members.includes(name))?.name || '-')
         : (isMe ? getDisplayGroupName() : '-'),
-      pic: isMe ? userInfo.profilePic : null,
+      pic: isMe ? userInfo.profilePic : (profileInfo?.profilePic || null),
       isMe,
-      status: isMe ? userInfo.statusMessage : ''
+      status: isMe ? userInfo.statusMessage : (profileInfo?.statusMessage || '')
     };
   }).sort((a, b) => b.distance - a.distance);
 
@@ -2679,7 +2682,7 @@ const App: React.FC = () => {
   const [groupMembers, setGroupMembers] = useState<string[]>([]);
   const [challenges, setChallenges] = useState<WeeklyChallenge[]>([]);
   const [allGroupsState, setAllGroupsState] = useState<Group[]>([]);
-  const [groupMemberMappings, setGroupMemberMappings] = useState<{ groupId: string, userName: string }[]>([]);
+  const [groupMemberMappings, setGroupMemberMappings] = useState<any[]>([]);
 
   // ============================================
   // Load data from Supabase on mount / login
@@ -3544,6 +3547,7 @@ const App: React.FC = () => {
         challenges={challenges}
         groupMembers={groupMembers}
         allUserNames={allUserNames}
+        groupMemberMappings={groupMemberMappings}
       />;
       case 'profile': return (
         <ProfileView

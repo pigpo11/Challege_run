@@ -500,9 +500,11 @@ export async function getAllGroups() {
 export async function getAllGroupMembers() {
     const { data } = await supabase
         .from('group_members')
-        .select('group_id, profiles(nickname)');
+        .select('group_id, profiles(nickname, profile_pic, status_message)');
     return (data || []).map((gm: any) => ({
         groupId: gm.group_id,
-        userName: gm.profiles?.nickname
+        userName: gm.profiles?.nickname,
+        profilePic: gm.profiles?.profile_pic,
+        statusMessage: gm.profiles?.status_message
     })).filter(gm => gm.userName);
 }
