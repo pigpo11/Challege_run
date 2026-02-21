@@ -33,11 +33,12 @@ export async function getAllUserNames(): Promise<string[]> {
 export async function getAllUserProfiles() {
     const { data } = await supabase
         .from('profiles')
-        .select('nickname, profile_pic, status_message');
+        .select('nickname, profile_pic, status_message, group_members(groups(name))');
     return (data || []).map((p: any) => ({
         userName: p.nickname,
         profilePic: p.profile_pic,
-        statusMessage: p.status_message
+        statusMessage: p.status_message,
+        groups: (p.group_members || []).map((gm: any) => gm.groups?.name).filter(Boolean)
     }));
 }
 

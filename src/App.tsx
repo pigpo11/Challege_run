@@ -859,7 +859,7 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGrou
       distance,
       displayTag: isGroupMode
         ? (teams.find(t => t.members.includes(name))?.name || '-')
-        : (isMe ? getDisplayGroupName() : '-'),
+        : (isMe ? getDisplayGroupName() : (profileInfo?.groups?.[0] || '-')),
       pic: isMe ? userInfo.profilePic : (profileInfo?.profilePic || null),
       isMe,
       status: isMe ? userInfo.statusMessage : (profileInfo?.statusMessage || '')
@@ -1273,7 +1273,7 @@ const ProfileView = ({
                 <div key={m.id} className="history-date-group">
                   <h4 className="history-date-header-v2">{dateHeader}</h4>
                   <div className="history-visual-grid" style={{ gridTemplateColumns: '1fr' }}>
-                    <div className={`history-visual-tile ${m.status}`} style={{ aspectRatio: '16/9', maxWidth: '100%' }} onClick={() => m.status === 'pending' && onEditMission(m)}>
+                    <div className={`history-visual-tile ${m.status}`} onClick={() => m.status === 'pending' && onEditMission(m)}>
                       {firstImage ? (
                         firstImage.includes('#vid') ? (
                           <video src={firstImage} className="history-tile-img" autoPlay loop muted playsInline />
