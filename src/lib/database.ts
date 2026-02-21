@@ -433,3 +433,25 @@ export async function kickMemberFromGroup(groupId: string, profileId: string) {
             .in('team_id', teamIds);
     }
 }
+
+// ============================================
+// Storage
+// ============================================
+
+export async function uploadFile(file: File): Promise<string> {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('missions')
+        .upload(filePath, file);
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage
+        .from('missions')
+        .getPublicUrl(filePath);
+
+    return data.publicUrl;
+}

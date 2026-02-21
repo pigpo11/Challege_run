@@ -469,7 +469,7 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
 };
 
 const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, currentWeek, challenges }: { group: Group | null, allGroups: Group[], team: Team | null, missions: Mission[], userInfo: any, onStartInput: () => void, currentWeek: number, challenges: WeeklyChallenge[] }) => {
-  const myMissions = missions.filter(m => (team ? m.teamId === team.id : m.teamId === 'individual') && m.week === currentWeek && m.userName === userInfo.name);
+  const myMissions = missions.filter(m => (team ? m.teamId === team.id : !m.teamId) && m.week === currentWeek && m.userName === userInfo.name);
   const currentChallenge = challenges.find(c => c.week === currentWeek);
 
   const aggregateStatus = myMissions.length === 0 ? 'none' :
@@ -626,7 +626,20 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
                       </div>
                       <div className="mission-grid">
                         {fields.map((m: any, idx: number) => {
-                          const record = myMissions.find(rm => rm.records?.missionId === (m.id || m.label));
+                          let record;
+                          if (cat === 'team' && team) {
+                            // For team missions, check if ANY team member submitted
+                            record = missions.find(rm =>
+                              rm.teamId === team.id &&
+                              rm.week === currentWeek &&
+                              rm.records?.missionId === (m.id || m.label) &&
+                              rm.status !== 'none'
+                            );
+                          } else {
+                            // For personal/strength, keep original logic
+                            record = myMissions.find(rm => rm.records?.missionId === (m.id || m.label));
+                          }
+
                           const status = record?.status || 'none';
                           const pCount = record?.records?.participantCount;
 
@@ -933,7 +946,6 @@ const PBInputItem = ({ label, id, value, onChange }: { label: string, id: string
 
 
 const ProfileView = ({
-  team,
   missions,
   userInfo,
   onUpdate,
@@ -942,7 +954,6 @@ const ProfileView = ({
   onLeaveGroup,
   currentGroupName
 }: {
-  team: Team | null,
   missions: Mission[],
   userInfo: any,
   onUpdate: (n: string, s: string, p: string | null, d: string, pbs: any, goal?: string) => void,
@@ -1012,7 +1023,7 @@ const ProfileView = ({
 
 
 
-  const myHistory = missions.filter(m => m.teamId === (team ? team.id : 'individual') && m.status !== 'none');
+  const myHistory = missions.filter(m => m.userName === userInfo.name && (m.status !== 'none' || m.type === '개인 러닝'));
 
   return (
     <div className="page-container pb-60">
@@ -1184,66 +1195,63 @@ const ProfileView = ({
 
         <div className="history-container-visual">
           {myHistory.length > 0 ? (() => {
-            const grouped = myHistory.reduce((acc: any, m) => {
-              const date = (m.timestamp || '').split('오전')[0].split('오후')[0].trim() || '날짜 미상';
-              if (!acc[date]) acc[date] = [];
-              acc[date].push(m);
-              return acc;
-            }, {});
+            const sortedMissions = [...myHistory].sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
 
+            return sortedMissions.map((m: Mission) => {
+              const d = new Date(m.timestamp || new Date());
+              const dateHeader = d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) + ' ' +
+                d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 
-            const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+              const firstImage = m.images && m.images.length > 0 ? m.images[0] : null;
+              const recordEntries = Object.entries(m.records || {}).filter(([_, v]) => v);
+              let recordSummary = '';
+              if (m.type === '개인 러닝') {
+                recordSummary = `${m.distance}km`;
+              } else if (recordEntries.length > 0) {
+                const [key, val] = recordEntries[0];
+                recordSummary = `${key} ${val}`;
+              }
 
-            return sortedDates.map(date => (
-              <div key={date} className="history-date-group">
-                <h4 className="history-date-header-v2">{date}</h4>
-                <div className="history-visual-grid">
-                  {grouped[date].map((m: Mission) => {
-                    const firstImage = m.images && m.images.length > 0 ? m.images[0] : null;
-                    const recordEntries = Object.entries(m.records || {}).filter(([_, v]) => v);
-                    let recordSummary = '';
-                    if (m.type === '개인 러닝') {
-                      recordSummary = `${m.distance}km`;
-                    } else if (recordEntries.length > 0) {
-                      const [key, val] = recordEntries[0];
-                      recordSummary = `${key} ${val}`;
-                    }
-
-                    return (
-                      <div key={m.id} className={`history-visual-tile ${m.status}`} onClick={() => m.status === 'pending' && onEditMission(m)}>
-                        {firstImage ? (
+              return (
+                <div key={m.id} className="history-date-group">
+                  <h4 className="history-date-header-v2">{dateHeader}</h4>
+                  <div className="history-visual-grid" style={{ gridTemplateColumns: '1fr' }}>
+                    <div className={`history-visual-tile ${m.status}`} style={{ aspectRatio: '16/9', maxWidth: '100%' }} onClick={() => m.status === 'pending' && onEditMission(m)}>
+                      {firstImage ? (
+                        firstImage.includes('#vid') ? (
+                          <video src={firstImage} className="history-tile-img" autoPlay loop muted playsInline />
+                        ) : (
                           <img src={firstImage} alt="History" className="history-tile-img" />
-                        ) : (
-                          <div className="history-tile-placeholder">
-                            <Activity size={18} color="#48484a" />
-                          </div>
-                        )}
-                        <div className="history-tile-overlay">
-                          <span className="history-tile-type">{m.type === '개인 러닝' ? '개인 러닝' : `인증 ${m.week}주차`}</span>
-                          <span className="history-tile-record-summary">{recordSummary}</span>
+                        )
+                      ) : (
+                        <div className="history-tile-placeholder">
+                          <Activity size={18} color="#48484a" />
                         </div>
-                        {m.status === 'pending' ? (
-                          <button
-                            className="history-tile-edit-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onEditMission(m);
-                            }}
-                          >
-                            <Edit2 size={10} />
-                            수정
-                          </button>
-
-                        ) : (
-                          <div className={`history-tile-status-dot ${m.status}`} />
-                        )}
+                      )}
+                      <div className="history-tile-overlay">
+                        <span className="history-tile-type">{m.type === '개인 러닝' ? '개인 러닝' : `인증 ${m.week}주차`}</span>
+                        <span className="history-tile-record-summary">{recordSummary}</span>
                       </div>
+                      {m.status === 'pending' ? (
+                        <button
+                          className="history-tile-edit-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditMission(m);
+                          }}
+                        >
+                          <Edit2 size={10} />
+                          수정
+                        </button>
 
-                    );
-                  })}
+                      ) : (
+                        <div className={`history-tile-status-dot ${m.status}`} />
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ));
+              );
+            });
           })() : (
             <div className="empty-history-premium py-40">
               <p className="text-gray-700 font-14">아직 인증된 기록이 없습니다.</p>
@@ -1423,20 +1431,70 @@ const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initi
   };
 
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
       const remainingSlots = 7 - photos.length;
       const filesToAdd = newFiles.slice(0, remainingSlots);
 
-      const newPhotos = filesToAdd.map(file => URL.createObjectURL(file));
-      setPhotos([...photos, ...newPhotos]);
+      for (const file of filesToAdd) {
+        // Video check
+        if (file.type.startsWith('video/')) {
+          // Size check (20MB)
+          if (file.size > 20 * 1024 * 1024) {
+            onToast('동영상은 20MB 이하만 가능합니다.');
+            continue;
+          }
+
+          // Duration check (10s)
+          try {
+            const videoUrl = URL.createObjectURL(file);
+            const video = document.createElement('video');
+            video.preload = 'metadata';
+            video.src = videoUrl;
+            await new Promise((resolve, reject) => {
+              video.onloadedmetadata = () => {
+                if (video.duration > 10.5) { // Allow slight buffer
+                  URL.revokeObjectURL(videoUrl);
+                  reject('10초 이내 영상만 가능합니다.');
+                } else {
+                  resolve(true);
+                }
+              };
+              video.onerror = () => {
+                URL.revokeObjectURL(videoUrl);
+                reject('영상 파일을 읽을 수 없습니다.');
+              };
+            });
+            const url = videoUrl + '#vid';
+            setPhotos(prev => [...prev, url]);
+            continue; // Already added
+          } catch (err: any) {
+            onToast(err);
+            continue;
+          }
+        } else if (file.type.startsWith('image/')) {
+          // Image size check (optional but good)
+          if (file.size > 10 * 1024 * 1024) {
+            onToast('이미지는 10MB 이하만 가능합니다.');
+            continue;
+          }
+        } else {
+          onToast('이미지 또는 동영상 파일만 가능합니다.');
+          continue;
+        }
+
+        const url = URL.createObjectURL(file);
+        setPhotos(prev => [...prev, url]);
+      }
     }
   };
 
   const removePhoto = (index: number) => {
     const newPhotos = [...photos];
-    URL.revokeObjectURL(newPhotos[index]);
+    // Video hash (#vid) removal for correct revocation
+    const rawUrl = newPhotos[index].split('#')[0];
+    URL.revokeObjectURL(rawUrl);
     newPhotos.splice(index, 1);
     setPhotos(newPhotos);
   };
@@ -1470,8 +1528,8 @@ const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initi
         </div>
         <p className="text-gray-500 font-14 leading-relaxed">
           {isGroup
-            ? <>챌린지 인증 사진을 추가해 주세요.<br />그룹장의 승인 후에 커뮤니티에 업로드 됩니다.⚡️</>
-            : <>거리가 포함된 러닝 인증 사진을 추가해 주세요.<br />인식된 거리는 마일리지에 즉시 반영됩니다.⚡️</>
+            ? <>챌린지 인증 사진/영상을 추가해 주세요.<br />그룹장의 승인 후에 커뮤니티에 업로드 됩니다.⚡️</>
+            : <>거리가 포함된 러닝 인증 사진/영상을 추가해 주세요.<br />인식된 거리는 마일리지에 즉시 반영됩니다.⚡️</>
           }
 
         </p>
@@ -1486,25 +1544,38 @@ const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initi
         {isGroup && (
           <div className="mt-0">
             <div className="flex-between mb-16">
-              <h3 className="text-white font-18 bold">인증 사진 <span className="text-gray-600 font-13 font-normal ml-8">{photos.length}/7</span></h3>
+              <h3 className="text-white font-18 bold">인증 사진/영상 <span className="text-gray-600 font-13 font-normal ml-8">{photos.length}/7</span></h3>
             </div>
 
             <div className="photo-upload-area">
-              <input type="file" ref={fileInputRef} className="hidden" accept="image/*" multiple onChange={handleFileChange} />
+              <input type="file" ref={fileInputRef} className="hidden" accept="image/*,video/*" multiple onChange={handleFileChange} />
               <div className="photo-upload-grid">
-                {photos.map((p, i) => (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    key={i}
-                    className="photo-preview shadow-lg"
-                  >
-                    <img src={p} alt="Certification" className="w-full h-full object-cover rounded-20" />
-                    <button className="btn-remove-photo" onClick={() => removePhoto(i)}>
-                      <X size={14} />
-                    </button>
-                  </motion.div>
-                ))}
+                {photos.map((p, i) => {
+                  // Since blob URLs don't have types easily accessible, we can try to guess or use a better way. 
+                  // But for now, let's just try to render as video if it fails as image or vice versa.
+                  // Better: let's use a dummy check or just render video if we know it from handleFileChange.
+                  // Actually, let's check if the URL contains "video" which we can add as a hash if needed.
+                  const urlWithHint = p;
+                  const reallyIsVideo = urlWithHint.includes('#vid');
+
+                  return (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      key={i}
+                      className="photo-preview shadow-lg"
+                    >
+                      {reallyIsVideo ? (
+                        <video src={p} className="w-full h-full object-cover rounded-20" muted playsInline />
+                      ) : (
+                        <img src={p} alt="Certification" className="w-full h-full object-cover rounded-20" />
+                      )}
+                      <button className="btn-remove-photo" onClick={() => removePhoto(i)}>
+                        <X size={14} />
+                      </button>
+                    </motion.div>
+                  );
+                })}
                 {photos.length < 7 && (
                   <div onClick={() => fileInputRef.current?.click()} className="photo-add-btn">
                     <Camera size={24} className="text-gray-500" />
@@ -1741,7 +1812,11 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
 
       <div className="mission-photo-container">
         {mission.images && mission.images.length > 0 ? (
-          <img src={mission.images[0]} alt="Certification" className="mission-photo" />
+          mission.images[0].includes('#vid') ? (
+            <video src={mission.images[0]} className="mission-photo" autoPlay loop muted playsInline />
+          ) : (
+            <img src={mission.images[0]} alt="Certification" className="mission-photo" />
+          )
         ) : (
           <div className="flex-center flex-col text-gray-800">
             <Camera size={48} />
@@ -2234,7 +2309,11 @@ const LeaderView = ({
                   </div>
                   <div className="grid grid-cols-1 gap-12">
                     {m.images.map((img, i) => (
-                      <img key={i} src={img} alt="Mission" className="mission-approve-img-square" />
+                      img.includes('#vid') ? (
+                        <video key={i} src={img} className="mission-approve-img-square" autoPlay loop muted playsInline />
+                      ) : (
+                        <img key={i} src={img} alt="Mission" className="mission-approve-img-square" />
+                      )
                     ))}
                   </div>
                 </div>
@@ -2876,14 +2955,29 @@ const App: React.FC = () => {
       return;
     }
 
-    setUserInfo((prev: any) => ({ ...prev, name, statusMessage: status, profilePic: pic, monthlyDistance: dist, pbs, monthlyGoal: goal || prev.monthlyGoal }));
+    let finalPic = pic;
+    if (pic && pic.startsWith('blob:')) {
+      try {
+        const response = await fetch(pic);
+        const blob = await response.blob();
+        const ext = blob.type.split('/')[1] || 'jpg';
+        const file = new File([blob], `profile-${Date.now()}.${ext}`, { type: blob.type });
+        finalPic = await db.uploadFile(file);
+      } catch (uploadErr) {
+        console.error('Profile pic upload failed:', uploadErr);
+        alert('프로필 사진 업로드에 실패했습니다. 사진을 제외하고 업데이트됩니다.');
+        finalPic = userInfo.profilePic; // Revert to old pic
+      }
+    }
+
+    setUserInfo((prev: any) => ({ ...prev, name, statusMessage: status, profilePic: finalPic, monthlyDistance: dist, pbs, monthlyGoal: goal || prev.monthlyGoal }));
 
     if (profileId) {
       try {
         await db.updateProfile(profileId, {
-          nickname: name, // Added this field
+          nickname: name,
           status_message: status,
-          profile_pic: pic,
+          profile_pic: finalPic,
           monthly_distance: parseFloat(dist) || 0,
           pbs,
           monthly_goal: parseFloat(goal || '100')
@@ -2894,7 +2988,7 @@ const App: React.FC = () => {
           setAllUserNames(prev => [...prev.filter(n => n !== userInfo.name), name]);
         }
 
-        localStorage.setItem('userInfo', JSON.stringify({ ...userInfo, name, statusMessage: status, profilePic: pic, monthlyDistance: dist, pbs, monthlyGoal: goal || userInfo.monthlyGoal }));
+        localStorage.setItem('userInfo', JSON.stringify({ ...userInfo, name, statusMessage: status, profilePic: finalPic, monthlyDistance: dist, pbs, monthlyGoal: goal || userInfo.monthlyGoal }));
       } catch (e: any) {
         console.error('Failed to update profile:', e);
         alert('프로필 업데이트에 실패했습니다: ' + (e.message || ''));
@@ -2950,6 +3044,29 @@ const App: React.FC = () => {
     }
 
     try {
+      // 1. Upload files to Supabase Storage if they are local blob URLs
+      const uploadedPhotos = await Promise.all(photos.map(async (url) => {
+        if (url.startsWith('blob:')) {
+          const rawUrl = url.split('#')[0];
+          const isVid = url.includes('#vid');
+
+          try {
+            const response = await fetch(rawUrl);
+            const blob = await response.blob();
+            // Generate a proper file name from the blob type
+            const ext = blob.type.split('/')[1] || (isVid ? 'mp4' : 'jpg');
+            const file = new File([blob], `upload-${Date.now()}.${ext}`, { type: blob.type });
+
+            const publicUrl = await db.uploadFile(file);
+            return publicUrl + (isVid ? '#vid' : '');
+          } catch (uploadErr) {
+            console.error('File upload failed:', uploadErr);
+            throw new Error('파일 업로드 중 오류가 발생했습니다.');
+          }
+        }
+        return url; // Already a remote URL
+      }));
+
       const created = await db.submitMission({
         groupId: isIndividual ? null : userGroupId,
         teamId: isIndividual ? null : userTeamId,
@@ -2960,7 +3077,7 @@ const App: React.FC = () => {
         status: isIndividual ? 'none' : 'pending',
         records,
         distance: addedDist,
-        images: photos
+        images: uploadedPhotos
       });
 
       setMissions((prev: any) => [{
@@ -3347,7 +3464,6 @@ const App: React.FC = () => {
       case 'ranking': return <RankingView currentGroupId={isGroupCtx ? userGroupId : null} userInfo={userInfo} teams={teams} missions={missions} groups={groups} myGroupIds={myGroupIds} challenges={challenges} />;
       case 'profile': return (
         <ProfileView
-          team={isGroupCtx ? currentTeam || null : null}
           missions={missions}
           userInfo={userInfo}
           onUpdate={handleUpdateProfile}

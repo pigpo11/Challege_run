@@ -1700,6 +1700,15 @@
   margin-bottom: 2px;
 }
 
+.history-tile-time {
+  font-size: 8px;
+  font-weight: 700;
+  color: #fff;
+  opacity: 0.6;
+  margin-bottom: 2px;
+  letter-spacing: 0.5px;
+}
+
 .history-tile-record-summary {
   font-size: 10px;
   font-weight: 800;
@@ -3379,7 +3388,7 @@ button {
   transition: all 0.2s;
 }
 
-.completed .mission-status-icon {
+.approved .mission-status-icon {
   background: var(--fit-green);
   border-color: var(--fit-green);
   color: var(--fit-black);
