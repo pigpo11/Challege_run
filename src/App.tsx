@@ -760,7 +760,7 @@ const HomeView = ({ group, allGroups, team, missions, userInfo, onStartInput, cu
   );
 };
 
-const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGroupIds, challenges, myTeamId }: { currentGroupId: string | null, userInfo: any, teams: Team[], missions: Mission[], groups: Group[], myGroupIds: string[], challenges: WeeklyChallenge[], myTeamId: string | null }) => {
+const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGroupIds, challenges, myTeamId, groupMembers, allUserNames }: { currentGroupId: string | null, userInfo: any, teams: Team[], missions: Mission[], groups: Group[], myGroupIds: string[], challenges: WeeklyChallenge[], myTeamId: string | null, groupMembers: string[], allUserNames: string[] }) => {
   const [rankTab, setRankTab] = useState<'team' | 'individual'>('team');
   const [displayGroupIdx, setDisplayGroupIdx] = useState(0);
 
@@ -800,20 +800,20 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGrou
     : [];
 
   // Individual rankings (this month only)
-  // Get all unique users who have missions this month
-  let monthUserNames = Array.from(new Set(currentMonthMissions.map(m => m.userName)));
-  if (!monthUserNames.includes(userInfo.name)) monthUserNames.push(userInfo.name);
+  // Decide the pool of users based on mode
+  let monthUserNames: string[] = [];
 
-  // If in Group Mode / Individual Tab -> Filter by current user's team ONLY
-  if (isGroupMode && rankTab === 'individual' && myTeamId) {
-    const activeTeam = teams.find(t => t.id === myTeamId);
-    if (activeTeam) {
-      monthUserNames = monthUserNames.filter(name => activeTeam.members.includes(name));
-      // Ensure all team members are present even if they have 0 distance this month
-      activeTeam.members.forEach(mName => {
-        if (!monthUserNames.includes(mName)) monthUserNames.push(mName);
-      });
-    }
+  if (isGroupMode) {
+    // 1. Group Mode: Show only members of THIS group
+    monthUserNames = [...groupMembers];
+  } else {
+    // 2. Individual Mode: Show all valid members (exclude deleted traces)
+    // Only show names that exist in allUserNames to handle deleted users like 'ㅎㅇ'
+    const missionNames = Array.from(new Set(currentMonthMissions.map(m => m.userName)));
+    monthUserNames = missionNames.filter(name => allUserNames.includes(name));
+
+    // Ensure I'm always in the list
+    if (!monthUserNames.includes(userInfo.name)) monthUserNames.push(userInfo.name);
   }
 
   const individualRankings = monthUserNames.map(name => {
@@ -2306,8 +2306,12 @@ const LeaderView = ({
                         </div>
                       )}
                       {entries.map(([key, val]) => {
-                        const displayKey = key.toLowerCase() === 'participantcount' ? '참가 인원' : key;
+                        const fieldInfo = challenge?.recordFields?.find(f => f.id === key);
+                        let displayKey = fieldInfo ? fieldInfo.label : key;
+
+                        if (key.toLowerCase() === 'participantcount') displayKey = '참가 인원';
                         const displayVal = key.toLowerCase() === 'participantcount' ? `${val}인` : String(val);
+
                         return (
                           <div className="record-display-item" key={key}>
                             <span className="text-gray-500 font-11 bold uppercase tracking-widest mb-4">{displayKey}</span>
@@ -3483,7 +3487,18 @@ const App: React.FC = () => {
           />
         );
 
-      case 'ranking': return <RankingView currentGroupId={isGroupCtx ? userGroupId : null} userInfo={userInfo} teams={teams} missions={missions} groups={groups} myGroupIds={myGroupIds} challenges={challenges} myTeamId={userTeamId} />;
+      case 'ranking': return <RankingView
+        currentGroupId={isGroupCtx ? userGroupId : null}
+        userInfo={userInfo}
+        teams={teams}
+        missions={missions}
+        groups={groups}
+        myGroupIds={myGroupIds}
+        challenges={challenges}
+        myTeamId={userTeamId}
+        groupMembers={groupMembers}
+        allUserNames={allUserNames}
+      />;
       case 'profile': return (
         <ProfileView
           missions={missions}
