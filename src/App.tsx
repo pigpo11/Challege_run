@@ -1855,7 +1855,7 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
     <div className="mission-card-premium">
       <div className="mission-card-header flex-between">
         <div className="flex items-center gap-12">
-          <div className="mission-user-avatar">
+          <div className="avatar-v2-wrap">
             {profilePic && !isAvatarBroken ? (
               <img src={profilePic} alt={mission.userName} className="avatar-v2" onError={() => setIsAvatarBroken(true)} />
             ) : (
