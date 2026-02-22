@@ -2740,14 +2740,12 @@
 .mission-user-avatar {
   width: 40px;
   height: 40px;
-  border-radius: 50%;
+  border-radius: 14px;
   background: #2c2c2e;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-weight: 700;
-  border: 1px solid #3a3a3c;
 }
 
 .mission-user-info .name {

@@ -1857,9 +1857,11 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
         <div className="flex items-center gap-12">
           <div className="mission-user-avatar">
             {profilePic && !isAvatarBroken ? (
-              <img src={profilePic} alt={mission.userName} className="w-full h-full object-cover rounded-full" onError={() => setIsAvatarBroken(true)} />
+              <img src={profilePic} alt={mission.userName} className="avatar-v2" onError={() => setIsAvatarBroken(true)} />
             ) : (
-              mission.userName.substring(0, 1)
+              <div className="avatar-v2-placeholder">
+                {mission.userName.substring(0, 1)}
+              </div>
             )}
           </div>
           <div className="mission-user-info">
@@ -2710,12 +2712,12 @@ const App: React.FC = () => {
   const loadUserData = React.useCallback(async (pId: string, nickname: string) => {
     try {
       // Use Promise.all for parallel loading
-      const [myGroups, challengeList, profile, allSystemGroups, allProfiles] = await Promise.all([
+      const [myGroups, challengeList, profile, allSystemGroups, allMappings] = await Promise.all([
         db.getMyGroups(pId),
         db.getChallenges(),
         db.getFullProfile(pId),
         db.getAllGroups(),
-        db.getAllUserProfiles()
+        db.getAllGroupMembers()
       ]);
 
       // 1. Process Groups
@@ -2733,7 +2735,7 @@ const App: React.FC = () => {
       // 2. Process Challenges
       setChallenges(challengeList);
       setAllGroupsState(allSystemGroups);
-      setGroupMemberMappings(allProfiles);
+      setGroupMemberMappings(allMappings);
 
       // 3. Process Profile & Refresh dependencies
       if (profile) {
