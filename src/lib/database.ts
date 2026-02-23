@@ -365,6 +365,22 @@ export async function approveMission(missionId: string) {
         .eq('id', missionId);
 }
 
+export async function updateMission(missionId: string, updates: {
+    records?: Record<string, string>;
+    distance?: number;
+    images?: string[];
+}) {
+    const { error } = await supabase
+        .from('missions')
+        .update({
+            records: updates.records,
+            distance: updates.distance,
+            images: updates.images
+        })
+        .eq('id', missionId);
+    if (error) throw error;
+}
+
 export async function deleteMission(missionId: string) {
     await supabase.from('missions').delete().eq('id', missionId);
 }
@@ -512,11 +528,12 @@ export async function getAllGroups() {
 export async function getAllGroupMembers() {
     const { data } = await supabase
         .from('group_members')
-        .select('group_id, profiles(nickname, profile_pic, status_message)');
+        .select('group_id, groups(name), profiles(nickname, profile_pic, status_message)');
     return (data || []).map((gm: any) => ({
         groupId: gm.group_id,
         userName: gm.profiles?.nickname,
         profilePic: gm.profiles?.profile_pic,
-        statusMessage: gm.profiles?.status_message
+        statusMessage: gm.profiles?.status_message,
+        groups: gm.groups?.name ? [gm.groups.name] : []
     })).filter(gm => gm.userName);
 }

@@ -1797,6 +1797,21 @@ const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initi
   );
 };
 
+const ImageWithFallback = ({ src, alt, className }: { src: string, alt: string, className: string }) => {
+  const [error, setError] = useState(false);
+  if (error) {
+    return (
+      <div className="flex-center flex-col bg-gray-900 w-full h-full min-h-[300px] text-gray-500 p-20 text-center">
+        <Camera size={40} className="mb-12 opacity-50" />
+        <p className="font-13 bold text-white mb-4">이미지를 불러올 수 없습니다</p>
+        <p className="font-11 opacity-70">HEIC 형식이나 일시적인 통신 오류일 수 있습니다.</p>
+        <a href={src} target="_blank" rel="noreferrer" className="mt-16 text-green font-11 bold underline">원본 파일 보기</a>
+      </div>
+    );
+  }
+  return <img src={src} alt={alt} className={className} onError={() => setError(true)} />;
+};
+
 const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComment, onDeleteMission, onDeleteComment, challenges, groupMemberMappings }: {
   mission: Mission,
   currentUserName: string,
@@ -1811,6 +1826,15 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
 }) => {
   const [commentText, setCommentText] = useState('');
   const [isAvatarBroken, setIsAvatarBroken] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
+
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      const idx = Math.round(scrollRef.current.scrollLeft / scrollRef.current.offsetWidth);
+      setActivePhotoIdx(idx);
+    }
+  };
   const isLiked = mission.likedBy.includes(currentUserName);
   const isAdmin = userRole === 'leader';
   const isAuthor = mission.userName === currentUserName;
@@ -1879,15 +1903,34 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
         )}
       </div>
 
-      <div className="mission-photo-container">
+      <div className="mission-photo-container relative">
         {mission.images && mission.images.length > 0 ? (
-          mission.images[0].includes('#vid') ? (
-            <video src={mission.images[0]} className="mission-photo" autoPlay loop muted playsInline />
-          ) : (
-            <img src={mission.images[0]} alt="Certification" className="mission-photo" />
-          )
+          <>
+            <div
+              className="mission-photo-scroll"
+              ref={scrollRef}
+              onScroll={handleScroll}
+            >
+              {mission.images.map((img, i) => (
+                <div key={i} className="mission-photo-item">
+                  {img.includes('#vid') ? (
+                    <video src={img} className="mission-photo" autoPlay loop muted playsInline />
+                  ) : (
+                    <ImageWithFallback src={img} alt={`Certification ${i + 1}`} className="mission-photo" />
+                  )}
+                </div>
+              ))}
+            </div>
+            {mission.images.length > 1 && (
+              <div className="photo-indicators">
+                {mission.images.map((_, i) => (
+                  <div key={i} className={`indicator ${i === activePhotoIdx ? 'active' : ''}`} />
+                ))}
+              </div>
+            )}
+          </>
         ) : (
-          <div className="flex-center flex-col text-gray-800">
+          <div className="flex-center flex-col text-gray-800 py-40">
             <Camera size={48} />
             <p className="font-12 mt-8">인증 사진 없음</p>
           </div>
@@ -2385,11 +2428,13 @@ const LeaderView = ({
                   </div>
                   <div className="grid grid-cols-1 gap-12">
                     {m.images.map((img, i) => (
-                      img.includes('#vid') ? (
-                        <video key={i} src={img} className="mission-approve-img-square" autoPlay loop muted playsInline />
-                      ) : (
-                        <img key={i} src={img} alt="Mission" className="mission-approve-img-square" />
-                      )
+                      <div key={i} className="mb-8">
+                        {img.includes('#vid') ? (
+                          <video src={img} className="mission-approve-img-square" autoPlay loop muted playsInline />
+                        ) : (
+                          <ImageWithFallback src={img} alt="Mission" className="mission-approve-img-square" />
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -3100,12 +3145,56 @@ const App: React.FC = () => {
     if (!profileId) return;
 
     if (editingMission) {
-      setMissions((prev: any) => prev.map((m: any) => m.id === editingMission.id ? {
-        ...m,
-        records,
-        images: photos,
-        distance: parseFloat(distance) || 0
-      } : m));
+      try {
+        const uploadedPhotos = await Promise.all(photos.map(async (url) => {
+          if (url.startsWith('blob:')) {
+            const rawUrl = url.split('#')[0];
+            const isVid = url.includes('#vid');
+            const response = await fetch(rawUrl);
+            const blob = await response.blob();
+            let finalBlob = blob;
+            let ext = blob.type.split('/')[1] || (isVid ? 'mp4' : 'jpg');
+            if (!isVid && blob.type.startsWith('image/')) {
+              try {
+                const converted = await new Promise<Blob>((resolve, reject) => {
+                  const img = new Image();
+                  img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width; canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                      ctx.drawImage(img, 0, 0);
+                      canvas.toBlob(b => b ? resolve(b) : reject(), 'image/jpeg', 0.8);
+                    } else reject();
+                  };
+                  img.onerror = reject;
+                  img.src = url;
+                });
+                finalBlob = converted; ext = 'jpg';
+              } catch (e) { /* fallback to original */ }
+            }
+            const file = new File([finalBlob], `upload-${Date.now()}.${ext}`, { type: finalBlob.type });
+            const publicUrl = await db.uploadFile(file);
+            return publicUrl + (isVid ? '#vid' : '');
+          }
+          return url;
+        }));
+
+        await db.updateMission(editingMission.id, {
+          records,
+          images: uploadedPhotos,
+          distance: parseFloat(distance) || 0
+        });
+
+        setMissions((prev: any) => prev.map((m: any) => m.id === editingMission.id ? {
+          ...m,
+          records,
+          images: uploadedPhotos,
+          distance: parseFloat(distance) || 0
+        } : m));
+      } catch (e: any) {
+        alert('수정 실패: ' + e.message);
+      }
       setEditingMission(null);
       setIsInputView(false);
       return;
@@ -3141,10 +3230,39 @@ const App: React.FC = () => {
           try {
             const response = await fetch(rawUrl);
             const blob = await response.blob();
-            // Generate a proper file name from the blob type
-            const ext = blob.type.split('/')[1] || (isVid ? 'mp4' : 'jpg');
-            const file = new File([blob], `upload-${Date.now()}.${ext}`, { type: blob.type });
 
+            let finalBlob = blob;
+            let ext = blob.type.split('/')[1] || (isVid ? 'mp4' : 'jpg');
+
+            // Image conversion to JPEG for better compatibility (HEIC to JPG transition)
+            if (!isVid && blob.type.startsWith('image/')) {
+              try {
+                const converted = await new Promise<Blob>((resolve, reject) => {
+                  const img = new Image();
+                  img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                      ctx.drawImage(img, 0, 0);
+                      canvas.toBlob((b) => {
+                        if (b) resolve(b);
+                        else reject();
+                      }, 'image/jpeg', 0.8);
+                    } else reject();
+                  };
+                  img.onerror = () => reject();
+                  img.src = url;
+                });
+                finalBlob = converted;
+                ext = 'jpg';
+              } catch (e) {
+                console.log('Conversion skipped', e);
+              }
+            }
+
+            const file = new File([finalBlob], `upload-${Date.now()}.${ext}`, { type: finalBlob.type });
             const publicUrl = await db.uploadFile(file);
             return publicUrl + (isVid ? '#vid' : '');
           } catch (uploadErr) {

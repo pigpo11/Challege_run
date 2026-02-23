@@ -2759,18 +2759,67 @@
 
 .mission-photo-container {
   width: 100%;
-  max-height: 500px;
   background: #000;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  position: relative;
+}
+
+.mission-photo-scroll {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}
+
+.mission-photo-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.mission-photo-item {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  min-height: 400px;
 }
 
 .mission-photo {
   max-width: 100%;
   max-height: 500px;
+  width: auto;
+  height: auto;
   object-fit: contain;
+}
+
+.photo-indicators {
+  position: absolute;
+  bottom: 16px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  z-index: 2;
+}
+
+.photo-indicators .indicator {
+  width: 6px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transition: all 0.3s;
+}
+
+.photo-indicators .indicator.active {
+  background: var(--fit-green);
+  width: 16px;
+  border-radius: 3px;
 }
 
 
