@@ -2874,6 +2874,43 @@ const App: React.FC = () => {
     }
   }, []); // Only recreate if static imports change (never)
 
+  const syncUserMileage = React.useCallback(async (pId: string, allMissions: Mission[]) => {
+    if (!pId) return;
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+
+    const userMissions = allMissions.filter(m => {
+      const d = new Date(m.timestamp || new Date());
+      return m.profileId === pId &&
+        (d.getMonth() + 1) === currentMonth &&
+        d.getFullYear() === currentYear;
+    });
+
+    const totalDist = userMissions.reduce((sum, m) => {
+      if (m.status === 'approved' || m.type === '개인 러닝') {
+        return sum + (m.distance || 0);
+      }
+      return sum;
+    }, 0);
+
+    const distStr = totalDist.toFixed(1);
+
+    // Update State
+    setUserInfo(prev => {
+      const updated = { ...prev, monthlyDistance: distStr };
+      localStorage.setItem('userInfo', JSON.stringify(updated));
+      return updated;
+    });
+
+    // Update DB
+    try {
+      await db.updateProfile(pId, { monthly_distance: totalDist, last_updated_month: currentMonth });
+    } catch (e) {
+      console.error('Failed to sync mileage:', e);
+    }
+  }, []);
+
+
   // On mount: check if user was previously logged in
   useEffect(() => {
     if (profileId && !userInfo.name) {
@@ -3149,9 +3186,11 @@ const App: React.FC = () => {
   // Missions (Supabase-backed)
   // ============================================
   const approveMission = async (missionId: string) => {
-    setMissions((prev: any) => prev.map((m: any) => m.id === missionId ? { ...m, status: 'approved' } : m));
+    const newList = missions.map((m: any) => m.id === missionId ? { ...m, status: 'approved' } : m);
+    setMissions(newList);
     try {
       await db.approveMission(missionId);
+      if (profileId) await syncUserMileage(profileId, newList);
     } catch (e) {
       console.error('Failed to approve mission:', e);
     }
@@ -3202,12 +3241,14 @@ const App: React.FC = () => {
           distance: parseFloat(distance) || 0
         });
 
-        setMissions((prev: any) => prev.map((m: any) => m.id === editingMission.id ? {
+        const newList = missions.map((m: any) => m.id === editingMission.id ? {
           ...m,
           records,
           images: uploadedPhotos,
           distance: parseFloat(distance) || 0
-        } : m));
+        } : m);
+        setMissions(newList);
+        if (profileId) await syncUserMileage(profileId, newList);
       } catch (e: any) {
         alert('수정 실패: ' + e.message);
       }
@@ -3218,23 +3259,6 @@ const App: React.FC = () => {
 
     const isIndividual = viewMode === 'individual';
     const addedDist = parseFloat(distance) || 0;
-
-    // Update individual mileage
-    if (isIndividual) {
-      const currentMonth = new Date().getMonth() + 1;
-      setUserInfo((prev: any) => {
-        const isNewMonth = prev.lastUpdatedMonth !== currentMonth;
-        const baseDist = isNewMonth ? 0 : parseFloat(prev.monthlyDistance);
-        const updated = { ...prev, monthlyDistance: (baseDist + addedDist).toFixed(1), lastUpdatedMonth: currentMonth };
-        localStorage.setItem('userInfo', JSON.stringify(updated));
-        return updated;
-      });
-      if (profileId) {
-        const currentMonth = new Date().getMonth() + 1;
-        const baseDist = userInfo.lastUpdatedMonth !== currentMonth ? 0 : parseFloat(userInfo.monthlyDistance);
-        await db.updateProfile(profileId, { monthly_distance: baseDist + addedDist, last_updated_month: currentMonth });
-      }
-    }
 
     try {
       // 1. Upload files to Supabase Storage if they are local blob URLs
@@ -3302,7 +3326,7 @@ const App: React.FC = () => {
         images: uploadedPhotos
       });
 
-      setMissions((prev: any) => [{
+      const createdItem = {
         id: created.id,
         groupId: created.group_id,
         teamId: created.team_id,
@@ -3317,7 +3341,11 @@ const App: React.FC = () => {
         images: created.images || [],
         likedBy: [],
         comments: []
-      }, ...prev]);
+      };
+
+      const newList = [createdItem, ...missions];
+      setMissions(newList);
+      if (profileId) await syncUserMileage(profileId, newList);
     } catch (e) {
       console.error('Failed to submit mission:', e);
     }
@@ -3351,9 +3379,11 @@ const App: React.FC = () => {
 
   const deleteMission = async (id: string) => {
     if (window.confirm('인증 게시물을 삭제하시겠습니까?')) {
-      setMissions((prev: any) => prev.filter((m: any) => m.id !== id));
+      const newList = missions.filter((m: any) => m.id !== id);
+      setMissions(newList);
       try {
         await db.deleteMission(id);
+        if (profileId) await syncUserMileage(profileId, newList);
       } catch (e) {
         console.error('Failed to delete mission:', e);
       }
