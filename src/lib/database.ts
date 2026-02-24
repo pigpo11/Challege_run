@@ -50,8 +50,29 @@ export async function updateProfile(profileId: string, updates: Record<string, a
         .select()
         .single();
     if (error) throw error;
+
+    // If nickname was updated, sync it to other tables
+    if (updates.nickname) {
+        await syncProfileName(profileId, updates.nickname);
+    }
+
     return data;
 }
+
+export async function syncProfileName(profileId: string, newNickname: string) {
+    // Update missions
+    await supabase
+        .from('missions')
+        .update({ user_name: newNickname })
+        .eq('profile_id', profileId);
+
+    // Update comments
+    await supabase
+        .from('comments')
+        .update({ user_name: newNickname })
+        .eq('profile_id', profileId);
+}
+
 
 export async function getFullProfile(profileId: string) {
     const { data, error } = await supabase

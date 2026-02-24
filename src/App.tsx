@@ -27,6 +27,7 @@ type Mission = {
   id: string;
   groupId: string;
   teamId: string;
+  profileId: string;
   userName: string;
   week: number;
   type: string;
@@ -38,6 +39,7 @@ type Mission = {
   likedBy: string[];
   comments: Comment[];
 };
+
 
 
 type Comment = {
@@ -3118,8 +3120,22 @@ const App: React.FC = () => {
 
         // Update allUserNames list
         if (name !== userInfo.name) {
-          setAllUserNames(prev => [...prev.filter(n => n !== userInfo.name), name]);
+          const oldName = userInfo.name;
+          setAllUserNames(prev => [...prev.filter(n => n !== oldName), name]);
+          // Sync missions state locally
+          setMissions(prev => prev.map(m => m.profileId === profileId ? { ...m, userName: name } : m));
+          // Sync teams state locally
+          setTeams(prev => prev.map(t => ({
+            ...t,
+            members: t.members.map(m => m === oldName ? name : m)
+          })));
+          // Sync group members list
+          setGroupMembers(prev => prev.map(m => m === oldName ? name : m));
+          // Sync mappings 
+          setGroupMemberMappings(prev => prev.map(m => m.userName === oldName ? { ...m, userName: name } : m));
         }
+
+
 
         localStorage.setItem('userInfo', JSON.stringify({ ...userInfo, name, statusMessage: status, profilePic: finalPic, monthlyDistance: dist, pbs, monthlyGoal: goal || userInfo.monthlyGoal }));
       } catch (e: any) {
