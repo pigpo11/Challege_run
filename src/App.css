@@ -3494,3 +3494,28 @@ button {
   background: var(--fit-green);
   color: var(--fit-black);
 }
+
+/* Partner Selector */
+.partner-bubble {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s;
+}
+
+.partner-bubble.active {
+  background: var(--fit-green-dim);
+  border-color: var(--fit-green);
+  color: var(--fit-green);
+}
+
+.partner-selector-wrap {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 14px;
+}

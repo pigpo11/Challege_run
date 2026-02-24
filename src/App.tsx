@@ -72,8 +72,17 @@ const WEEK1_STRUCTURE = {
   ]
 };
 
-const calculatePoints = (missions: Mission[], userName: string, challenges?: WeeklyChallenge[]) => {
-  const userMissions = missions.filter(m => m.userName === userName && m.status === 'approved');
+const calculatePoints = (missions: Mission[], userName: string, challenges?: WeeklyChallenge[], userTeamId?: string) => {
+  const userMissions = missions.filter(m => {
+    if (m.status !== 'approved') return false;
+    // 내가 업로드한 경우
+    if (m.userName === userName) return true;
+    // 내가 파트너로 지목된 경우 (2인 미션)
+    if (m.records?.partnerName === userName) return true;
+    // 우리 팀 전체가 수행한 경우 (4인 미션)
+    if (m.records?.participantCount === '4' && m.teamId === userTeamId && userTeamId) return true;
+    return false;
+  });
 
   // Group missions by week
   const missionsByWeek = userMissions.reduce((acc: any, m) => {
@@ -477,8 +486,8 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
   const aggregateStatus = myMissions.length === 0 ? 'none' :
     myMissions.some(m => m.status === 'pending') ? 'pending' : 'approved';
 
-  const myPoints = calculatePoints(missions, userInfo.name, challenges);
-  const teamPoints = team ? (team.members.reduce((sum, name) => sum + calculatePoints(missions, name, challenges), 0) + (team.bonusPoints || 0)) : 0;
+  const myPoints = calculatePoints(missions, userInfo.name, challenges, team?.id);
+  const teamPoints = team ? (team.members.reduce((sum, name) => sum + calculatePoints(missions, name, challenges, team.id), 0) + (team.bonusPoints || 0)) : 0;
 
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
@@ -649,12 +658,20 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
                         {fields.map((m: any, idx: number) => {
                           let record;
                           if (cat === 'team' && team) {
-                            // For team missions, check if ANY team member submitted
+                            // For team missions, find valid record based on participant logic
                             record = missions.find(rm =>
                               rm.teamId === team.id &&
                               rm.week === currentWeek &&
                               rm.records?.missionId === (m.id || m.label) &&
-                              rm.status !== 'none'
+                              rm.status !== 'none' &&
+                              (
+                                // 4인이면 팀원 모두에게 표시
+                                rm.records?.participantCount === '4' ||
+                                // 2인이면 업로더 또는 선택된 파트너에게 표시
+                                (rm.records?.participantCount === '2' && (rm.userName === userInfo.name || rm.records?.partnerName === userInfo.name)) ||
+                                // 1인이면 본인에게만 표시
+                                ((!rm.records?.participantCount || rm.records?.participantCount === '1') && rm.userName === userInfo.name)
+                              )
                             );
                           } else {
                             // For personal/strength, keep original logic
@@ -663,13 +680,21 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
 
                           const status = record?.status || 'none';
                           const pCount = record?.records?.participantCount;
+                          const partnerName = record?.records?.partnerName;
 
                           return (
                             <div key={m.id || m.label} className={`mission-item-card ${status}`}>
                               <div className="mission-item-content">
                                 <div className="mission-number">{idx + 1}</div>
                                 <div className="mission-text-wrap">
-                                  <p className="mission-title">{m.title || m.label} {status !== 'none' && pCount && <span className="text-green ml-4">({pCount}인)</span>}</p>
+                                  <p className="mission-title">
+                                    {m.title || m.label}
+                                    {status !== 'none' && pCount && (
+                                      <span className="text-green ml-4">
+                                        ({pCount}인{pCount === '2' && partnerName ? `: ${partnerName}` : ''})
+                                      </span>
+                                    )}
+                                  </p>
                                   <p className="mission-sub">{m.sub}</p>
                                 </div>
                                 <div className="mission-status-icon">
@@ -816,7 +841,7 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGrou
   // Calculate real team rankings based on challenge points (this month only)
   const teamRankings = isGroupMode
     ? teams.filter(t => t.groupId === currentGroupId).map(t => {
-      const points = t.members.reduce((sum, name) => sum + calculatePoints(currentMonthMissions, name, challenges), 0) + (t.bonusPoints || 0);
+      const points = t.members.reduce((sum, name) => sum + calculatePoints(currentMonthMissions, name, challenges, t.id), 0) + (t.bonusPoints || 0);
       return { name: t.name, pts: points, members: t.members.length };
     }).sort((a, b) => b.pts - a.pts)
     : [];
@@ -1444,7 +1469,7 @@ const DistanceExtractor = ({ onExtract, onImageSelect, distance, setDistance, is
 
 
 
-const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initialMission, currentWeek, missions, currentUserName }: { onBack: () => void, onSubmit: (r: any, p: string[], d: string) => void, onToast: (msg: string) => void, isGroup: boolean, challenge?: WeeklyChallenge, initialMission?: Mission, currentWeek: number, missions: Mission[], currentUserName: string }) => {
+const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initialMission, currentWeek, missions, currentUserName, teamMembers = [] }: { onBack: () => void, onSubmit: (r: any, p: string[], d: string) => void, onToast: (msg: string) => void, isGroup: boolean, challenge?: WeeklyChallenge, initialMission?: Mission, currentWeek: number, missions: Mission[], currentUserName: string, teamMembers?: string[] }) => {
   const [records, setRecords] = useState<any>(initialMission?.records || {});
   const [photos, setPhotos] = useState<string[]>(initialMission?.images || []);
   const [runDistance, setRunDistance] = useState<string>(initialMission ? String(initialMission.distance) : '0');
@@ -1694,18 +1719,45 @@ const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initi
                             </div>
 
                             {cat === 'team' && records.missionId === itemId && (
-                              <div className="participant-picker" onClick={e => e.stopPropagation()}>
-                                <p className="text-gray-500 font-12 mr-8">참여 인원:</p>
-                                {[1, 2, 4].map(num => (
-                                  <div
-                                    key={num}
-                                    className={`participant-bubble ${String(records.participantCount || '1') === String(num) ? 'active' : ''}`}
-                                    onClick={() => setRecords({ ...records, participantCount: String(num) })}
-                                  >
-                                    {num}인
+                              <>
+                                <div className="participant-picker" onClick={e => e.stopPropagation()}>
+                                  <p className="text-gray-500 font-12 mr-8">참여 인원:</p>
+                                  {[1, 2, 4].map(num => (
+                                    <div
+                                      key={num}
+                                      className={`participant-bubble ${String(records.participantCount || '1') === String(num) ? 'active' : ''}`}
+                                      onClick={() => {
+                                        const newCount = String(num);
+                                        const updates: any = { participantCount: newCount };
+                                        if (newCount !== '2') updates.partnerName = ''; // 2인이 아님 파트너 초기화
+                                        setRecords({ ...records, ...updates });
+                                      }}
+                                    >
+                                      {num}인
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {records.participantCount === '2' && (
+                                  <div className="partner-selector-wrap mt-12" onClick={e => e.stopPropagation()}>
+                                    <p className="text-gray-500 font-12 mb-8">함께한 멤버 선택:</p>
+                                    <div className="flex flex-wrap gap-8">
+                                      {teamMembers.filter(m => m !== currentUserName).map(m => (
+                                        <div
+                                          key={m}
+                                          className={`partner-bubble ${records.partnerName === m ? 'active' : ''}`}
+                                          onClick={() => setRecords({ ...records, partnerName: m })}
+                                        >
+                                          {m}
+                                        </div>
+                                      ))}
+                                      {teamMembers.filter(m => m !== currentUserName).length === 0 && (
+                                        <p className="text-gray-700 font-12">선택 가능한 팀원이 없습니다.</p>
+                                      )}
+                                    </div>
                                   </div>
-                                ))}
-                              </div>
+                                )}
+                              </>
                             )}
                           </div>
                         );
@@ -1848,26 +1900,22 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
   const challenge = challenges.find(c => c.week === mission.week);
   const missionId = mission.records?.missionId;
   const category = mission.records?.category;
-  let missionTitle = "";
   let categoryLabel = "";
-
   if (category === 'personal') categoryLabel = '개인';
   else if (category === 'strength') categoryLabel = '스트렝스';
   else if (category === 'team') categoryLabel = '팀 미션';
 
-  if (missionId) {
-    const field = challenge?.recordFields?.find(f => f.id === missionId);
-    if (field) missionTitle = field.label;
-    else {
-      // Fallback to WEEK1_STRUCTURE
-      const allW1 = [...WEEK1_STRUCTURE.personal, ...WEEK1_STRUCTURE.strength, ...WEEK1_STRUCTURE.team];
-      const w1Field = (allW1 as any[]).find(f => f.id === missionId);
-      if (w1Field) missionTitle = w1Field.title;
-    }
-  }
+  const missionTitle = missionId ? (
+    challenge?.recordFields?.find(f => f.id === missionId)?.label ||
+    ([...WEEK1_STRUCTURE.personal, ...WEEK1_STRUCTURE.strength, ...WEEK1_STRUCTURE.team] as any[])
+      .find(f => f.id === missionId)?.title || ""
+  ) : "";
+
+  const partnerName = mission.records?.partnerName;
+  const pCount = mission.records?.participantCount;
 
   const displayTag = missionTitle
-    ? `${categoryLabel ? categoryLabel + ' - ' : ''}${missionTitle} / ${mission.week}주차`
+    ? `${categoryLabel ? categoryLabel + ' - ' : ''}${missionTitle}${pCount && pCount !== '1' ? ` (${pCount}인${pCount === '2' && partnerName ? `: ${partnerName}` : ''})` : ''} / ${mission.week}주차`
     : (mission.type === '개인 러닝' ? `개인 러닝 / ${mission.week}주차` : `${mission.week}주차 인증`);
 
   const handleCommentSubmit = (e: React.FormEvent) => {
@@ -2408,6 +2456,7 @@ const LeaderView = ({
                         let displayKey = fieldInfo ? fieldInfo.label : key;
 
                         if (key.toLowerCase() === 'participantcount') displayKey = '참가 인원';
+                        if (key.toLowerCase() === 'partnername') displayKey = '함께한 멤버';
                         const displayVal = key.toLowerCase() === 'participantcount' ? `${val}인` : String(val);
 
                         return (
@@ -3676,6 +3725,7 @@ const App: React.FC = () => {
         currentWeek={editingMission?.week || currentPeriod}
         missions={missions}
         currentUserName={userInfo.name}
+        teamMembers={currentTeam?.members || []}
       />
     );
 
