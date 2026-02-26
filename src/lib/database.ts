@@ -1,4 +1,15 @@
 import { supabase } from './supabase';
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+
+// Cloudflare R2 Client Configuration
+const r2Client = new S3Client({
+    region: "auto",
+    endpoint: import.meta.env.VITE_R2_ENDPOINT,
+    credentials: {
+        accessKeyId: import.meta.env.VITE_R2_ACCESS_KEY_ID,
+        secretAccessKey: import.meta.env.VITE_R2_SECRET_ACCESS_KEY,
+    },
+});
 
 // ============================================
 // Auth / Profiles
@@ -519,19 +530,22 @@ export async function kickMemberFromGroup(groupId: string, profileId: string) {
 export async function uploadFile(file: File): Promise<string> {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
 
-    const { error: uploadError } = await supabase.storage
-        .from('missions')
-        .upload(filePath, file);
+    const command = new PutObjectCommand({
+        Bucket: import.meta.env.VITE_R2_BUCKET_NAME,
+        Key: fileName,
+        Body: file,
+        ContentType: file.type,
+    });
 
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage
-        .from('missions')
-        .getPublicUrl(filePath);
-
-    return data.publicUrl;
+    try {
+        await r2Client.send(command);
+        // Public access URL (Must be configured in Cloudflare R2 settings)
+        return `${import.meta.env.VITE_R2_PUBLIC_URL}/${fileName}`;
+    } catch (uploadError) {
+        console.error("R2 Upload Error:", uploadError);
+        throw new Error("파일 업로드에 실패했습니다. (Cloudflare R2)");
+    }
 }
 
 export async function getAllGroups() {

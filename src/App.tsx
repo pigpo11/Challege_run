@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Home, Trophy, Calendar, Settings, ChevronLeft, Camera, Check, Plus, ArrowRight, Activity, Zap, Share2, UserPlus, Shield, User, Trash, Edit2, X, MoreVertical, Heart, MessageCircle, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createWorker } from 'tesseract.js';
+import imageCompression from 'browser-image-compression';
 import * as db from './lib/database';
 import './App.css';
 
@@ -902,6 +903,7 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGrou
             src={p.pic}
             alt={p.name}
             className="avatar-v2"
+            loading="lazy"
             onError={() => setFailedImages(prev => new Set(prev).add(p.name))}
           />
         ) : (
@@ -1305,7 +1307,7 @@ const ProfileView = ({
                         firstImage.includes('#vid') ? (
                           <video src={firstImage} className="history-tile-img" autoPlay loop muted playsInline />
                         ) : (
-                          <img src={firstImage} alt="History" className="history-tile-img" />
+                          <img src={firstImage} alt="History" className="history-tile-img" loading="lazy" />
                         )
                       ) : (
                         <div className="history-tile-placeholder">
@@ -1863,7 +1865,7 @@ const ImageWithFallback = ({ src, alt, className }: { src: string, alt: string, 
       </div>
     );
   }
-  return <img src={src} alt={alt} className={className} onError={() => setError(true)} />;
+  return <img src={src} alt={alt} className={className} loading="lazy" onError={() => setError(true)} />;
 };
 
 const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComment, onDeleteMission, onDeleteComment, challenges, groupMemberMappings }: {
@@ -3181,8 +3183,16 @@ const App: React.FC = () => {
       try {
         const response = await fetch(pic);
         const blob = await response.blob();
-        const ext = blob.type.split('/')[1] || 'jpg';
-        const file = new File([blob], `profile-${Date.now()}.${ext}`, { type: blob.type });
+
+        const compressionOptions = {
+          maxSizeMB: 0.5,
+          maxWidthOrHeight: 800,
+          useWebWorker: true,
+          fileType: 'image/webp'
+        };
+
+        const compressedBlob = await imageCompression(new File([blob], 'profile.jpg', { type: blob.type }), compressionOptions);
+        const file = new File([compressedBlob], `profile-${Date.now()}.webp`, { type: 'image/webp' });
         finalPic = await db.uploadFile(file);
       } catch (uploadErr) {
         console.error('Profile pic upload failed:', uploadErr);
@@ -3254,32 +3264,32 @@ const App: React.FC = () => {
           if (url.startsWith('blob:')) {
             const rawUrl = url.split('#')[0];
             const isVid = url.includes('#vid');
-            const response = await fetch(rawUrl);
-            const blob = await response.blob();
-            let finalBlob = blob;
-            let ext = blob.type.split('/')[1] || (isVid ? 'mp4' : 'jpg');
-            if (!isVid && blob.type.startsWith('image/')) {
-              try {
-                const converted = await new Promise<Blob>((resolve, reject) => {
-                  const img = new Image();
-                  img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = img.width; canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                      ctx.drawImage(img, 0, 0);
-                      canvas.toBlob(b => b ? resolve(b) : reject(), 'image/jpeg', 0.8);
-                    } else reject();
-                  };
-                  img.onerror = reject;
-                  img.src = url;
-                });
-                finalBlob = converted; ext = 'jpg';
-              } catch (e) { /* fallback to original */ }
+
+            try {
+              const response = await fetch(rawUrl);
+              const blob = await response.blob();
+
+              if (!isVid && blob.type.startsWith('image/')) {
+                const compressionOptions = {
+                  maxSizeMB: 1,
+                  maxWidthOrHeight: 1280,
+                  useWebWorker: true,
+                  fileType: 'image/webp'
+                };
+                const compressedBlob = await imageCompression(new File([blob], 'mission.jpg', { type: blob.type }), compressionOptions);
+                const file = new File([compressedBlob], `mission-${Date.now()}.webp`, { type: 'image/webp' });
+                return (await db.uploadFile(file));
+              }
+
+              // Fallback for videos or if compression fails
+              const ext = blob.type.split('/')[1] || (isVid ? 'mp4' : 'jpg');
+              const file = new File([blob], `upload-${Date.now()}.${ext}`, { type: blob.type });
+              const publicUrl = await db.uploadFile(file);
+              return publicUrl + (isVid ? '#vid' : '');
+            } catch (e) {
+              console.error('Upload failed', e);
+              return url;
             }
-            const file = new File([finalBlob], `upload-${Date.now()}.${ext}`, { type: finalBlob.type });
-            const publicUrl = await db.uploadFile(file);
-            return publicUrl + (isVid ? '#vid' : '');
           }
           return url;
         }));
@@ -3320,38 +3330,27 @@ const App: React.FC = () => {
             const response = await fetch(rawUrl);
             const blob = await response.blob();
 
-            let finalBlob = blob;
-            let ext = blob.type.split('/')[1] || (isVid ? 'mp4' : 'jpg');
-
-            // Image conversion to JPEG for better compatibility (HEIC to JPG transition)
+            // Image compression
             if (!isVid && blob.type.startsWith('image/')) {
               try {
-                const converted = await new Promise<Blob>((resolve, reject) => {
-                  const img = new Image();
-                  img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                      ctx.drawImage(img, 0, 0);
-                      canvas.toBlob((b) => {
-                        if (b) resolve(b);
-                        else reject();
-                      }, 'image/jpeg', 0.8);
-                    } else reject();
-                  };
-                  img.onerror = () => reject();
-                  img.src = url;
-                });
-                finalBlob = converted;
-                ext = 'jpg';
-              } catch (e) {
-                console.log('Conversion skipped', e);
+                const compressionOptions = {
+                  maxSizeMB: 1,
+                  maxWidthOrHeight: 1280,
+                  useWebWorker: true,
+                  fileType: 'image/webp'
+                };
+                const compressedBlob = await imageCompression(new File([blob], 'mission.jpg', { type: blob.type }), compressionOptions);
+                const file = new File([compressedBlob], `mission-${Date.now()}.webp`, { type: 'image/webp' });
+                const publicUrl = await db.uploadFile(file);
+                return publicUrl;
+              } catch (compErr) {
+                console.error('Compression failed, falling back to original', compErr);
               }
             }
 
-            const file = new File([finalBlob], `upload-${Date.now()}.${ext}`, { type: finalBlob.type });
+            // Fallback for videos or failed compression
+            const ext = blob.type.split('/')[1] || (isVid ? 'mp4' : 'jpg');
+            const file = new File([blob], `upload-${Date.now()}.${ext}`, { type: blob.type });
             const publicUrl = await db.uploadFile(file);
             return publicUrl + (isVid ? '#vid' : '');
           } catch (uploadErr) {
