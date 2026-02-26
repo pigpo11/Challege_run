@@ -528,7 +528,7 @@ export async function uploadFile(file: File): Promise<string> {
     const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
 
     try {
-        const { data, error } = await supabase.storage
+        const { error } = await supabase.storage
             .from(BUCKET_NAME)
             .upload(fileName, file);
 
