@@ -12,7 +12,7 @@ const CACHE_PROXY_URL = 'https://challegerun.gudtjr1218.workers.dev/img-proxy?ur
 export function getProxiedUrl(url: string | null): string {
     if (!url) return '';
     // 이미 프록시가 적용되어 있거나, 외부 URL이 아닌 경우 그대로 반환
-    if (url.startsWith('/img-proxy') || !url.startsWith('http')) return url;
+    if (url.startsWith('/img-proxy') || !url.startsWith('http') || url.includes('/img-proxy?url=')) return url;
     // 프록시 적용 (주소 깨짐 방지를 위해 인코딩 추가)
     return `${CACHE_PROXY_URL}${encodeURIComponent(url)}`;
 }

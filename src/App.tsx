@@ -3776,14 +3776,13 @@ const App: React.FC = () => {
           const isMe = m.userName === userInfo.name;
           const isLeader = userRole === 'leader';
           const isApproved = m.status === 'approved';
-          if (!(isApproved || isMe || isLeader)) return false;
 
-          // 3. 그룹 필터링: 현재 그룹의 미션이거나 현재 그룹 멤버의 기록인 경우만 표시
-          if (userGroupId) {
-            const isGroupMission = m.groupId === userGroupId;
-            const isMemberMission = groupMembers.includes(m.userName);
-            return isGroupMission || isMemberMission;
-          }
+          // 승인된 모든 게시물은 노출 (업데이트 전 기본 동작)
+          // 리더는 소속 그룹의 승인 대기물 확인용 추가 노출
+          const isRelevantPending = (isMe || (isLeader && m.groupId === userGroupId)) && m.status === 'pending';
+
+          if (!(isApproved || isRelevantPending)) return false;
+
           return true;
         });
         return (
