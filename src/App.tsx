@@ -1471,7 +1471,7 @@ const DistanceExtractor = ({ onExtract, onImageSelect, distance, setDistance, is
 
 
 
-const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initialMission, currentWeek, missions, currentUserName, teamMembers = [] }: { onBack: () => void, onSubmit: (r: any, p: string[], d: string) => void, onToast: (msg: string) => void, isGroup: boolean, challenge?: WeeklyChallenge, initialMission?: Mission, currentWeek: number, missions: Mission[], currentUserName: string, teamMembers?: string[] }) => {
+const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initialMission, currentWeek, missions, currentUserName, isSubmitting, teamMembers = [] }: { onBack: () => void, onSubmit: (r: any, p: string[], d: string) => void, onToast: (msg: string) => void, isGroup: boolean, challenge?: WeeklyChallenge, initialMission?: Mission, currentWeek: number, missions: Mission[], currentUserName: string, isSubmitting?: boolean, teamMembers?: string[] }) => {
   const [records, setRecords] = useState<any>(initialMission?.records || {});
   const [photos, setPhotos] = useState<string[]>(initialMission?.images || []);
   const [runDistance, setRunDistance] = useState<string>(initialMission ? String(initialMission.distance) : '0');
@@ -1847,7 +1847,14 @@ const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initi
       </div>
 
       <div className="px-20 pb-32 pt-16">
-        <button className="btn-primary-lg" onClick={handleFinalSubmit}>제출하기</button>
+        <button className="btn-primary-lg" onClick={handleFinalSubmit} disabled={isSubmitting}>
+          {isSubmitting ? (
+            <div className="flex items-center gap-8">
+              <div className="animate-spin h-16 w-16 border-2 border-white/30 border-t-white rounded-full" />
+              <span>업로드 중...</span>
+            </div>
+          ) : '제출하기'}
+        </button>
       </div>
     </div>
   );
@@ -1944,6 +1951,7 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
             <div className="flex items-center gap-6">
               <p className="name">{mission.userName}</p>
               {authorTeam && <span className="font-12 text-gray-500 bg-gray-900 px-6 py-2 rounded-4">{authorTeam.name}</span>}
+              {mission.status === 'pending' && <span className="font-11 text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 px-4 py-1 rounded-4">승인 대기 중</span>}
             </div>
             <p className="meta">{new Date(mission.timestamp || new Date()).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · {displayTag}</p>
           </div>
@@ -2918,6 +2926,12 @@ const App: React.FC = () => {
       const allMissionList = await db.getAllMissions();
       setMissions(allMissionList);
 
+      // 4. Set currentPeriod to the latest challenge week
+      if (challengeList.length > 0) {
+        const latestWeek = Math.max(...challengeList.map((c: any) => c.week));
+        setCurrentPeriod(latestWeek);
+      }
+
     } catch (e) {
       console.error('Data Loading Error:', e);
     } finally {
@@ -3256,10 +3270,11 @@ const App: React.FC = () => {
   };
 
   const submitMissionHandler = async (records: any, photos: string[], distance: string) => {
-    if (!profileId) return;
+    if (!profileId || isSubmitting) return;
+    setIsSubmitting(true);
 
-    if (editingMission) {
-      try {
+    try {
+      if (editingMission) {
         const uploadedPhotos = await Promise.all(photos.map(async (url) => {
           if (url.startsWith('blob:')) {
             const rawUrl = url.split('#')[0];
@@ -3308,18 +3323,14 @@ const App: React.FC = () => {
         } : m);
         setMissions(newList);
         if (profileId) await syncUserMileage(profileId, newList);
-      } catch (e: any) {
-        alert('수정 실패: ' + e.message);
+        setEditingMission(null);
+        setIsInputView(false);
+        return;
       }
-      setEditingMission(null);
-      setIsInputView(false);
-      return;
-    }
 
-    const isIndividual = viewMode === 'individual';
-    const addedDist = parseFloat(distance) || 0;
+      const isIndividual = viewMode === 'individual';
+      const addedDist = parseFloat(distance) || 0;
 
-    try {
       // 1. Upload files to Supabase Storage if they are local blob URLs
       const uploadedPhotos = await Promise.all(photos.map(async (url) => {
         if (url.startsWith('blob:')) {
@@ -3394,11 +3405,13 @@ const App: React.FC = () => {
       const newList = [createdItem, ...missions];
       setMissions(newList);
       if (profileId) await syncUserMileage(profileId, newList);
-    } catch (e) {
-      console.error('Failed to submit mission:', e);
+      setIsInputView(false);
+    } catch (e: any) {
+      console.error('Failed to submit/update mission:', e);
+      alert('작업 실패: ' + (e.message || '알 수 없는 오류'));
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setIsInputView(false);
   };
 
   const likeMission = async (id: string) => {
@@ -3724,6 +3737,7 @@ const App: React.FC = () => {
         currentWeek={editingMission?.week || currentPeriod}
         missions={missions}
         currentUserName={userInfo.name}
+        isSubmitting={isSubmitting}
         teamMembers={currentTeam?.members || []}
       />
     );
@@ -3754,9 +3768,24 @@ const App: React.FC = () => {
           />
         );
       case 'community':
-        const filteredMissions = viewWeek
-          ? missions.filter((m: any) => m.week === viewWeek && m.status === 'approved')
-          : missions.filter((m: any) => m.status === 'approved');
+        const filteredMissions = missions.filter((m: any) => {
+          // 1. 주차 필터링 (선택된 경우)
+          if (viewWeek && m.week !== viewWeek) return false;
+
+          // 2. 권한/상태 필터링: 승인된 게시물 OR 본인 게시물 OR 리더(승인용)
+          const isMe = m.userName === userInfo.name;
+          const isLeader = userRole === 'leader';
+          const isApproved = m.status === 'approved';
+          if (!(isApproved || isMe || isLeader)) return false;
+
+          // 3. 그룹 필터링: 현재 그룹의 미션이거나 현재 그룹 멤버의 기록인 경우만 표시
+          if (userGroupId) {
+            const isGroupMission = m.groupId === userGroupId;
+            const isMemberMission = groupMembers.includes(m.userName);
+            return isGroupMission || isMemberMission;
+          }
+          return true;
+        });
         return (
           <WeeklyFeedView
             week={viewWeek}
