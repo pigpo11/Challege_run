@@ -3,8 +3,8 @@ import { supabase } from './supabase';
 // Supabase Storage Bucket Name
 const BUCKET_NAME = 'missions';
 
-// Cloudflare Worker Cache Proxy (Relative Path)
-const CACHE_PROXY_URL = '/img-proxy?url=';
+// Cloudflare Worker Cache Proxy (Absolute Path to enable caching everywhere)
+const CACHE_PROXY_URL = 'https://challegerun.gudtjr1218.workers.dev/img-proxy?url=';
 
 /**
  * Supabase URL을 Cloudflare Proxy URL로 변환하여 캐싱을 활성화합니다.
