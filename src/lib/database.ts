@@ -1,15 +1,11 @@
 import { supabase } from './supabase';
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-// Cloudflare R2 Client Configuration
-const r2Client = new S3Client({
-    region: "auto",
-    endpoint: import.meta.env.VITE_R2_ENDPOINT,
-    credentials: {
-        accessKeyId: import.meta.env.VITE_R2_ACCESS_KEY_ID,
-        secretAccessKey: import.meta.env.VITE_R2_SECRET_ACCESS_KEY,
-    },
-});
+// Supabase Storage Bucket Name
+const BUCKET_NAME = 'missions';
+
+// Cloudflare Worker Cache Proxy (Optional)
+// 카드가 없을 경우 Cloudflare Worker를 만들어 이 URL만 환경 변수에 넣으면 됩니다.
+const CACHE_PROXY_URL = import.meta.env.VITE_CACHE_PROXY_URL || '';
 
 // ============================================
 // Auth / Profiles
@@ -531,21 +527,25 @@ export async function uploadFile(file: File): Promise<string> {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
 
-    const command = new PutObjectCommand({
-        Bucket: import.meta.env.VITE_R2_BUCKET_NAME,
-        Key: fileName,
-        Body: file,
-        ContentType: file.type,
-        CacheControl: "public, max-age=31536000, immutable", // Cache for 1 year
-    });
-
     try {
-        await r2Client.send(command);
-        // Public access URL (Must be configured in Cloudflare R2 settings)
-        return `${import.meta.env.VITE_R2_PUBLIC_URL}/${fileName}`;
+        const { data, error } = await supabase.storage
+            .from(BUCKET_NAME)
+            .upload(fileName, file);
+
+        if (error) throw error;
+
+        // Get the public URL
+        const { data: { publicUrl } } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName);
+
+        // If Proxy URL exists, use it to cache images via Cloudflare
+        if (CACHE_PROXY_URL) {
+            return `${CACHE_PROXY_URL}/${publicUrl}`;
+        }
+
+        return publicUrl;
     } catch (uploadError) {
-        console.error("R2 Upload Error:", uploadError);
-        throw new Error("파일 업로드에 실패했습니다. (Cloudflare R2)");
+        console.error("Storage Upload Error:", uploadError);
+        throw new Error("파일 업로드에 실패했습니다. (Supabase Storage)");
     }
 }
 
