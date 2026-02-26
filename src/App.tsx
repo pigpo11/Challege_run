@@ -538,7 +538,7 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
               <div className="stat-card-distance">
                 <div className="mileage-card-v2">
                   <span className="mileage-current" style={{ fontSize: '42px' }}>
-                    {userInfo.monthlyDistance}<span className="font-18 text-gray-600 ml-4 font-normal">km</span>
+                    {Number(userInfo.monthlyDistance).toLocaleString(undefined, { maximumFractionDigits: 2 })}<span className="font-18 text-gray-600 ml-4 font-normal">km</span>
                   </span>
                   <div className="mileage-progress-bar-wrap mt-16">
 
@@ -580,7 +580,7 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
               <div key={g.id} className="mini-rank-item">
                 <span className="rank-num">{i + 1}</span>
                 <span className="group-name">{g.name}</span>
-                <span className="group-score">{(g.monthlyDistance || 0).toLocaleString()} km</span>
+                <span className="group-score">{(g.monthlyDistance || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} km</span>
               </div>
             ))}
           </div>
@@ -733,7 +733,7 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
               <div key={g.id} className={`mini-rank-item ${group && g.id === group.id ? 'active' : ''}`}>
                 <span className="rank-num">{i + 1}</span>
                 <span className="group-name">{g.name}</span>
-                <span className="group-score">{(g.monthlyDistance || 0).toLocaleString()} km</span>
+                <span className="group-score">{(g.monthlyDistance || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} km</span>
               </div>
             ))}
             {group && myGroupRank && myGroupRank > 5 && myGroupData && (
@@ -742,7 +742,7 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
                 <div className="mini-rank-item active">
                   <span className="rank-num">{myGroupRank}</span>
                   <span className="group-name">{group.name}</span>
-                  <span className="group-score">{(myGroupData.monthlyDistance || 0).toLocaleString()} km</span>
+                  <span className="group-score">{(myGroupData.monthlyDistance || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} km</span>
                 </div>
               </>
             )}
@@ -780,7 +780,7 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
               <div className="stat-card-distance">
                 <div className="mileage-card-v2">
                   <span className="mileage-current">
-                    {userInfo.monthlyDistance}<span className="font-14 text-gray-600 ml-4 font-normal">km</span>
+                    {Number(userInfo.monthlyDistance).toLocaleString(undefined, { maximumFractionDigits: 2 })}<span className="font-14 text-gray-600 ml-4 font-normal">km</span>
                   </span>
                   <div className="mileage-goal-wrap">
 
@@ -929,7 +929,7 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGrou
         )}
       </div>
       <div className="rank-pts-right">
-        <span className="rank-pts-num">{p.distance.toLocaleString()}</span>
+        <span className="rank-pts-num">{(Number(p.distance) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
         <span className="rank-pts-unit">km</span>
       </div>
     </div>
