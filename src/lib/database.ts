@@ -536,6 +536,7 @@ export async function uploadFile(file: File): Promise<string> {
         Key: fileName,
         Body: file,
         ContentType: file.type,
+        CacheControl: "public, max-age=31536000, immutable", // Cache for 1 year
     });
 
     try {
