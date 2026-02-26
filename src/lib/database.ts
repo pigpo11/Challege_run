@@ -3,9 +3,8 @@ import { supabase } from './supabase';
 // Supabase Storage Bucket Name
 const BUCKET_NAME = 'missions';
 
-// Cloudflare Worker Cache Proxy (Optional)
-// 카드가 없을 경우 Cloudflare Worker를 만들어 이 URL만 환경 변수에 넣으면 됩니다.
-const CACHE_PROXY_URL = import.meta.env.VITE_CACHE_PROXY_URL || '';
+// Cloudflare Worker Cache Proxy (Relative Path)
+const CACHE_PROXY_URL = '/img-proxy?url=';
 
 // ============================================
 // Auth / Profiles
@@ -537,10 +536,8 @@ export async function uploadFile(file: File): Promise<string> {
         // Get the public URL
         const { data: { publicUrl } } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName);
 
-        // If Proxy URL exists, use it to cache images via Cloudflare
-        if (CACHE_PROXY_URL) {
-            return `${CACHE_PROXY_URL}/${publicUrl}`;
-        }
+        // Use local proxy path to cache images via Cloudflare
+        return `${CACHE_PROXY_URL}${publicUrl}`;
 
         return publicUrl;
     } catch (uploadError) {
