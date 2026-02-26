@@ -900,7 +900,7 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGrou
       <div className="avatar-v2-wrap">
         {p.pic && !failedImages.has(p.name) ? (
           <img
-            src={p.pic}
+            src={db.getProxiedUrl(p.pic)}
             alt={p.name}
             className="avatar-v2"
             loading="lazy"
@@ -1652,9 +1652,9 @@ const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initi
                       className="photo-preview shadow-lg"
                     >
                       {reallyIsVideo ? (
-                        <video src={p} className="w-full h-full object-cover rounded-20" muted playsInline />
+                        <video src={db.getProxiedUrl(p)} className="w-full h-full object-cover rounded-20" muted playsInline />
                       ) : (
-                        <img src={p} alt="Certification" className="w-full h-full object-cover rounded-20" />
+                        <img src={db.getProxiedUrl(p)} alt="Certification" className="w-full h-full object-cover rounded-20" />
                       )}
                       <button className="btn-remove-photo" onClick={() => removePhoto(i)}>
                         <X size={14} />
@@ -1865,7 +1865,7 @@ const ImageWithFallback = ({ src, alt, className }: { src: string, alt: string, 
       </div>
     );
   }
-  return <img src={src} alt={alt} className={className} loading="lazy" onError={() => setError(true)} />;
+  return <img src={db.getProxiedUrl(src)} alt={alt} className={className} loading="lazy" onError={() => setError(true)} />;
 };
 
 const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComment, onDeleteMission, onDeleteComment, challenges, groupMemberMappings }: {
@@ -1933,7 +1933,7 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
         <div className="flex items-center gap-12">
           <div className="avatar-v2-wrap">
             {profilePic && !isAvatarBroken ? (
-              <img src={profilePic} alt={mission.userName} className="avatar-v2" onError={() => setIsAvatarBroken(true)} />
+              <img src={db.getProxiedUrl(profilePic)} alt={mission.userName} className="avatar-v2" onError={() => setIsAvatarBroken(true)} />
             ) : (
               <div className="avatar-v2-placeholder">
                 {mission.userName.substring(0, 1)}
@@ -1966,7 +1966,7 @@ const MissionCard = ({ mission, currentUserName, userRole, teams, onLike, onComm
               {mission.images.map((img, i) => (
                 <div key={i} className="mission-photo-item">
                   {img.includes('#vid') ? (
-                    <video src={img} className="mission-photo" autoPlay loop muted playsInline />
+                    <video src={db.getProxiedUrl(img)} className="mission-photo" autoPlay loop muted playsInline />
                   ) : (
                     <ImageWithFallback src={img} alt={`Certification ${i + 1}`} className="mission-photo" />
                   )}
@@ -2483,7 +2483,7 @@ const LeaderView = ({
                     {m.images.map((img, i) => (
                       <div key={i} className="mb-8">
                         {img.includes('#vid') ? (
-                          <video src={img} className="mission-approve-img-square" autoPlay loop muted playsInline />
+                          <video src={db.getProxiedUrl(img)} className="mission-approve-img-square" autoPlay loop muted playsInline />
                         ) : (
                           <ImageWithFallback src={img} alt="Mission" className="mission-approve-img-square" />
                         )}

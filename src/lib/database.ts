@@ -6,6 +6,17 @@ const BUCKET_NAME = 'missions';
 // Cloudflare Worker Cache Proxy (Relative Path)
 const CACHE_PROXY_URL = '/img-proxy?url=';
 
+/**
+ * Supabase URL을 Cloudflare Proxy URL로 변환하여 캐싱을 활성화합니다.
+ */
+export function getProxiedUrl(url: string | null): string {
+    if (!url) return '';
+    // 이미 프록시가 적용되어 있거나, 외부 URL이 아닌 경우 그대로 반환
+    if (url.startsWith('/img-proxy') || !url.startsWith('http')) return url;
+    // 프록시 적용
+    return `${CACHE_PROXY_URL}${url}`;
+}
+
 // ============================================
 // Auth / Profiles
 // ============================================
