@@ -2901,7 +2901,8 @@ const App: React.FC = () => {
         leaderId: g.leader_id,
         inviteCode: g.invite_code,
         totalScore: g.total_score || 0,
-        totalDistance: Number(g.total_distance) || 0
+        totalDistance: Number(g.total_distance) || 0,
+        activeWeek: g.activeWeek || 1
       }));
       setGroups(groupList);
       setMyGroupIds(groupList.map(g => g.id));
