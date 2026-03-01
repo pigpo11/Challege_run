@@ -2993,10 +2993,11 @@ const App: React.FC = () => {
       const allMissionList = await db.getAllMissions();
       setMissions(allMissionList);
 
-      // 4. Set currentPeriod to the latest challenge week
+      // 4. Set currentPeriod to the latest challenge week or persisted week
       if (challengeList.length > 0) {
         const latestWeek = Math.max(...challengeList.map((c: any) => c.week));
-        setCurrentPeriod(latestWeek);
+        const storedWeek = localStorage.getItem(`active_week_${groupList[0]?.id || 'global'}`);
+        setCurrentPeriod(storedWeek ? parseInt(storedWeek) : latestWeek);
       }
 
     } catch (e) {
@@ -3831,7 +3832,10 @@ const App: React.FC = () => {
             onUpdate={updateChallenge}
             onDelete={deleteChallenge}
             currentWeek={currentPeriod}
-            onActivate={(w) => setCurrentPeriod(w)}
+            onActivate={(w) => {
+              setCurrentPeriod(w);
+              if (userGroupId) localStorage.setItem(`active_week_${userGroupId}`, w.toString());
+            }}
           />
         );
       case 'community':
