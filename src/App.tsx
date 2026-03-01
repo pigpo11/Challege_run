@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Home, Trophy, Calendar, Settings, ChevronLeft, Camera, Check, Plus, ArrowRight, Activity, Zap, Share2, UserPlus, Shield, User, Trash, Edit2, X, MoreVertical, Heart, MessageCircle, MessageSquare } from 'lucide-react';
+import { Home, Trophy, Calendar, Settings, ChevronLeft, ChevronDown, Camera, Check, Plus, ArrowRight, Activity, Zap, Share2, UserPlus, Shield, User, Trash, Edit2, X, MoreVertical, Heart, MessageCircle, MessageSquare } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createWorker } from 'tesseract.js';
 import imageCompression from 'browser-image-compression';
@@ -73,15 +73,13 @@ const WEEK1_STRUCTURE = {
   ]
 };
 
-const calculatePoints = (missions: Mission[], userName: string, challenges?: WeeklyChallenge[], userTeamId?: string) => {
+const calculatePoints = (missions: Mission[], userName: string, challenges?: WeeklyChallenge[]) => {
   const userMissions = missions.filter(m => {
     if (m.status !== 'approved') return false;
     // 내가 업로드한 경우
     if (m.userName === userName) return true;
-    // 내가 파트너로 지목된 경우 (2인 미션)
+    // 내가 파트너로 지목된 경우 (2인 미션) - 여전히 개인 득점에 기여할 수 있는 파트너 성과
     if (m.records?.partnerName === userName) return true;
-    // 우리 팀 전체가 수행한 경우 (4인 미션)
-    if (m.records?.participantCount === '4' && m.teamId === userTeamId && userTeamId) return true;
     return false;
   });
 
@@ -98,45 +96,73 @@ const calculatePoints = (missions: Mission[], userName: string, challenges?: Wee
     const week = parseInt(weekStr);
     const weeklyMissions = missionsByWeek[week];
 
-    if (week === 1) {
-      const completedIds = weeklyMissions.map((m: Mission) => m.records?.missionId).filter(Boolean);
-      let weeklyScore = 0;
+    const completedIds = weeklyMissions.map((m: Mission) => m.records?.missionId).filter(Boolean);
+    let weeklyScore = 0;
 
-      const week1Challenge = challenges?.find(c => c.week === 1);
-      const dbPersonal = week1Challenge?.recordFields?.filter(f => f.category === 'personal') || [];
-      const dbStrength = week1Challenge?.recordFields?.filter(f => f.category === 'strength') || [];
-      const dbTeam = week1Challenge?.recordFields?.filter(f => f.category === 'team') || [];
+    const currentChallenge = challenges?.find(c => c.week === week);
+    const dbPersonal = currentChallenge?.recordFields?.filter(f => f.category === 'personal') || [];
+    const dbStrength = currentChallenge?.recordFields?.filter(f => f.category === 'strength') || [];
+    const dbTeam = currentChallenge?.recordFields?.filter(f => f.category === 'team') || [];
 
-      // Personal
-      const pFields = week1Challenge ? dbPersonal : WEEK1_STRUCTURE.personal;
-      const pCount = pFields.filter(m => completedIds.includes(m.id)).length;
-      if (pCount === 2) weeklyScore += 7;
-      else if (pCount === 1) weeklyScore += 3;
+    // Personal (Already capped: 1 id match = 3, 2 ids match = 7)
+    const pFields = currentChallenge ? dbPersonal : (week === 1 ? WEEK1_STRUCTURE.personal : []);
+    const pCount = pFields.filter(m => completedIds.includes(m.id)).length;
+    if (pCount >= 2) weeklyScore += 7;
+    else if (pCount === 1) weeklyScore += 3;
 
-      // Strength
-      const sFields = week1Challenge ? dbStrength : WEEK1_STRUCTURE.strength;
-      const sCount = sFields.filter(m => completedIds.includes(m.id)).length;
-      if (sCount >= sFields.length && sFields.length > 0) weeklyScore += 10;
+    // Strength (Already capped: all ids match = 10)
+    const sFields = currentChallenge ? dbStrength : (week === 1 ? WEEK1_STRUCTURE.strength : []);
+    const sCount = sFields.filter((m: any) => completedIds.includes(m.id)).length;
+    if (sCount >= sFields.length && sFields.length > 0) weeklyScore += 10;
+    const tFields = currentChallenge ? dbTeam : (week === 1 ? WEEK1_STRUCTURE.team : []);
 
-      // Team
-      const tFields = week1Challenge ? dbTeam : WEEK1_STRUCTURE.team;
-      const teamMissions = weeklyMissions.filter((m: Mission) => tFields.some(tf => tf.id === m.records?.missionId));
+    totalScore += weeklyScore;
 
-      teamMissions.forEach((tm: any) => {
-        const pCount = parseInt(tm.records?.participantCount || '1');
-        if (pCount >= 4) weeklyScore += 45;
-        else if (pCount >= 2) weeklyScore += 20;
-        else weeklyScore += 4;
-      });
-
-      totalScore += weeklyScore;
-    } else {
-      // Other weeks: 10 points per approved challenge certification
-      totalScore += weeklyMissions.filter((m: Mission) => m.type === '챌린지 인증').length * 10;
+    // Fallback for non-structured challenge missions (Category-less)
+    if (pFields.length === 0 && sFields.length === 0 && tFields.length === 0) {
+      if (weeklyMissions.some((m: Mission) => m.type === '챌린지 인증')) {
+        totalScore += 10;
+      }
     }
   });
 
   return totalScore;
+};
+
+const calculateTeamMissionPoints = (missions: Mission[], teamId: string, challenges?: WeeklyChallenge[]) => {
+  const teamMissions = missions.filter(m => m.teamId === teamId && m.status === 'approved');
+  if (teamMissions.length === 0) return 0;
+
+  // Group by week
+  const missionsByWeek = teamMissions.reduce((acc: any, m) => {
+    if (!acc[m.week]) acc[m.week] = [];
+    acc[m.week].push(m);
+    return acc;
+  }, {});
+
+  let totalTeamScore = 0;
+  Object.keys(missionsByWeek).forEach(weekStr => {
+    const week = parseInt(weekStr);
+    const weeklyMissions = missionsByWeek[week];
+    const currentChallenge = challenges?.find(c => c.week === week);
+    const tFields = currentChallenge?.recordFields?.filter(f => f.category === 'team') || (week === 1 ? WEEK1_STRUCTURE.team : []);
+
+    const validTeamMissions = weeklyMissions.filter((m: Mission) => tFields.some(tf => tf.id === m.records?.missionId));
+
+    let weeklySum = 0;
+    validTeamMissions.forEach((tm: any) => {
+      let score = 0;
+      const pc = parseInt(tm.records?.participantCount || '1');
+      if (pc >= 4) score = 45;
+      else if (pc >= 2) score = 20;
+      else score = 4;
+      weeklySum += score;
+    });
+    // Cap at 45 per week by summing all, but clamping to maximum 45
+    totalTeamScore += Math.min(45, weeklySum);
+  });
+
+  return totalTeamScore;
 };
 
 
@@ -424,7 +450,10 @@ const AuthView = ({ onLogin, onSignup, allUserNames }: { onLogin: (name: string,
                 className="auth-input text-24 font-bold text-center"
                 placeholder="100"
                 value={newGoal}
-                onChange={e => setNewGoal(e.target.value)}
+                onChange={e => {
+                  const v = e.target.value;
+                  if (v === '' || /^\d*\.?\d{0,2}$/.test(v)) setNewGoal(v);
+                }}
                 autoFocus
               />
               <span className="text-white font-20 ml-8">km</span>
@@ -487,8 +516,10 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
   const aggregateStatus = myMissions.length === 0 ? 'none' :
     myMissions.some(m => m.status === 'pending') ? 'pending' : 'approved';
 
-  const myPoints = calculatePoints(missions, userInfo.name, challenges, team?.id);
-  const teamPoints = team ? (team.members.reduce((sum, name) => sum + calculatePoints(missions, name, challenges, team.id), 0) + (team.bonusPoints || 0)) : 0;
+  const myPoints = calculatePoints(missions, userInfo.name, challenges);
+  const teamIndividualPoints = team ? team.members.reduce((sum, name) => sum + calculatePoints(missions, name, challenges), 0) : 0;
+  const teamMissionScore = team ? calculateTeamMissionPoints(missions, team.id, challenges) : 0;
+  const teamPoints = teamIndividualPoints + teamMissionScore + (team?.bonusPoints || 0);
 
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
@@ -531,14 +562,14 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
                   <p className="text-gray-400 font-16 bold">{new Date().getMonth() + 1}월 러닝 마일리지</p>
                 </div>
                 <div className="mileage-goal-wrap mt-0">
-                  <span className="mileage-goal-txt">목표 {userInfo.monthlyGoal}km 대비</span>
+                  <span className="mileage-goal-txt">목표 {Number(userInfo.monthlyGoal).toFixed(2)}km 대비</span>
                 </div>
               </div>
 
               <div className="stat-card-distance">
                 <div className="mileage-card-v2">
                   <span className="mileage-current" style={{ fontSize: '42px' }}>
-                    {Number(userInfo.monthlyDistance).toLocaleString(undefined, { maximumFractionDigits: 2 })}<span className="font-18 text-gray-600 ml-4 font-normal">km</span>
+                    {Number(userInfo.monthlyDistance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}<span className="font-18 text-gray-600 ml-4 font-normal">km</span>
                   </span>
                   <div className="mileage-progress-bar-wrap mt-16">
 
@@ -580,7 +611,7 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
               <div key={g.id} className="mini-rank-item">
                 <span className="rank-num">{i + 1}</span>
                 <span className="group-name">{g.name}</span>
-                <span className="group-score">{(g.monthlyDistance || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })} km</span>
+                <span className="group-score">{(g.monthlyDistance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} km</span>
               </div>
             ))}
           </div>
@@ -631,7 +662,7 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
               </div>
             </div>
 
-            {(currentWeek === 1 || (currentChallenge?.recordFields && currentChallenge.recordFields.some(f => f.category))) && (
+            {((currentChallenge?.recordFields && currentChallenge.recordFields.some(f => f.category)) || (currentWeek === 1 && !currentChallenge)) && (
               <div className="mission-container flex flex-col gap-24 mt-32">
                 {['personal', 'strength', 'team'].map(cat => {
                   const dbFields = currentChallenge?.recordFields?.filter(f => f.category === cat) || [];
@@ -651,9 +682,9 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
                               <Trophy size={18} className="text-green" />}
                           <span className="category-name">{cat === 'personal' ? '개인' : cat === 'strength' ? '스트렝스' : '팀 미션'}</span>
                         </div>
-                        {cat === 'team' && currentWeek === 1 && <span className="category-reward-badge">1인 <b>4P</b> / 2인 <b>20P</b> / 4인 <b>45P</b></span>}
-                        {cat === 'personal' && currentWeek === 1 && <span className="category-reward-badge">2개 <b>7P</b> / 1개 <b>3P</b></span>}
-                        {cat === 'strength' && currentWeek === 1 && <span className="category-reward-badge">모두 수행시 <b>10P</b></span>}
+                        {cat === 'team' && <span className="category-reward-badge">1인 <b>4P</b> / 2인 <b>20P</b> / 4인 <b>45P</b></span>}
+                        {cat === 'personal' && <span className="category-reward-badge">2개 <b>7P</b> / 1개 <b>3P</b></span>}
+                        {cat === 'strength' && <span className="category-reward-badge">모두 수행시 <b>10P</b></span>}
                       </div>
                       <div className="mission-grid">
                         {fields.map((m: any, idx: number) => {
@@ -802,7 +833,8 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
             </div>
           </div>
         </>
-      )}
+      )
+      }
     </div >
   );
 };
@@ -839,10 +871,12 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGrou
     }
   };
 
-  // Calculate real team rankings based on challenge points (this month only)
+  // Calculate real team rankings based on challenge points (ALL TIME)
   const teamRankings = isGroupMode
     ? teams.filter(t => t.groupId === currentGroupId).map(t => {
-      const points = t.members.reduce((sum, name) => sum + calculatePoints(currentMonthMissions, name, challenges, t.id), 0) + (t.bonusPoints || 0);
+      const individualSum = t.members.reduce((sum, name) => sum + calculatePoints(missions, name, challenges), 0);
+      const teamMissionsOnly = calculateTeamMissionPoints(missions, t.id, challenges);
+      const points = individualSum + teamMissionsOnly + (t.bonusPoints || 0);
       return { name: t.name, pts: points, members: t.members.length };
     }).sort((a, b) => b.pts - a.pts)
     : [];
@@ -929,7 +963,7 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGrou
         )}
       </div>
       <div className="rank-pts-right">
-        <span className="rank-pts-num">{(Number(p.distance) || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+        <span className="rank-pts-num">{(Number(p.distance) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         <span className="rank-pts-unit">km</span>
       </div>
     </div>
@@ -942,7 +976,9 @@ const RankingView = ({ currentGroupId, userInfo, teams, missions, groups, myGrou
           <h3 className="section-title-alt">
             {isGroupMode ? '실시간 챌린지 랭킹 👑' : '실시간 러닝 랭킹 👑'}
           </h3>
-          <span className="ranking-refresh-label">매월 1일 갱신</span>
+          <span className="ranking-refresh-label">
+            {isGroupMode && rankTab === 'team' ? '전체 누적 랭킹' : '매월 1일 갱신'}
+          </span>
         </div>
 
         {/* Tab Toggle (only in group mode) */}
@@ -1055,6 +1091,7 @@ const ProfileView = ({
   const [editPic, setEditPic] = useState<string | null>(userInfo.profilePic);
   const [editGoal, setEditGoal] = useState(userInfo.monthlyGoal);
   const [isProfilePicBroken, setIsProfilePicBroken] = useState(false);
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
 
   const picInputRef = useRef<HTMLInputElement>(null);
 
@@ -1145,7 +1182,10 @@ const ProfileView = ({
 
             <div className="input-group-v2 mt-16">
               <label>{new Date().getMonth() + 1}월 목표 마일리지 (km)</label>
-              <input type="number" className="no-spinner" value={editGoal} onChange={(e) => setEditGoal(e.target.value)} onFocus={(e) => e.target.select()} />
+              <input type="number" className="no-spinner" value={editGoal} onChange={(e) => {
+                const v = e.target.value;
+                if (v === '' || /^\d*\.?\d{0,2}$/.test(v)) setEditGoal(v);
+              }} onFocus={(e) => e.target.select()} />
             </div>
 
 
@@ -1275,75 +1315,99 @@ const ProfileView = ({
 
       {/* Menu Sections */}
       <div className="menu-group-container mt-40">
-        <div className="px-20 mb-20 flex-between">
-          <h3 className="section-title-alt">인증 히스토리</h3>
+        <div
+          className="mx-20 px-20 py-22 flex items-center gap-10 cursor-pointer"
+          style={{ background: '#1c1c1e', borderRadius: '20px', marginBottom: '20px', marginTop: '32px' }}
+          onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+        >
+          <h3 className="section-title-alt" style={{ fontSize: '16px', fontWeight: 800, margin: 0, padding: 0 }}>
+            인증 히스토리
+          </h3>
+          <motion.div
+            animate={{ rotate: isHistoryExpanded ? 180 : 0 }}
+            className="flex items-center"
+            style={{ display: 'flex' }}
+          >
+            <ChevronDown size={20} color="var(--fit-green)" />
+          </motion.div>
         </div>
 
-        <div className="history-container-visual">
-          {myHistory.length > 0 ? (() => {
-            const sortedMissions = [...myHistory].sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+        <AnimatePresence>
+          {isHistoryExpanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="history-container-visual">
+                {myHistory.length > 0 ? (() => {
+                  const sortedMissions = [...myHistory].sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
 
-            return sortedMissions.map((m: Mission) => {
-              const d = new Date(m.timestamp || new Date());
-              const dateHeader = d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) + ' ' +
-                d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+                  return sortedMissions.map((m: Mission) => {
+                    const d = new Date(m.timestamp || new Date());
+                    const dateHeader = d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) + ' ' +
+                      d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 
-              const firstImage = m.images && m.images.length > 0 ? m.images[0] : null;
-              const recordEntries = Object.entries(m.records || {}).filter(([_, v]) => v);
-              let recordSummary = '';
-              if (m.type === '개인 러닝') {
-                recordSummary = `${m.distance}km`;
-              } else if (recordEntries.length > 0) {
-                const [key, val] = recordEntries[0];
-                recordSummary = `${key} ${val}`;
-              }
+                    const firstImage = m.images && m.images.length > 0 ? m.images[0] : null;
+                    const recordEntries = Object.entries(m.records || {}).filter(([_, v]) => v);
+                    let recordSummary = '';
+                    if (m.type === '개인 러닝') {
+                      recordSummary = `${Number(m.distance).toFixed(2)}km`;
+                    } else if (recordEntries.length > 0) {
+                      const [key, val] = recordEntries[0];
+                      recordSummary = `${key} ${val}`;
+                    }
 
-              return (
-                <div key={m.id} className="history-date-group">
-                  <h4 className="history-date-header-v2">{dateHeader}</h4>
-                  <div className="history-visual-grid" style={{ gridTemplateColumns: '1fr' }}>
-                    <div className={`history-visual-tile ${m.status}`} onClick={() => m.status === 'pending' && onEditMission(m)}>
-                      {firstImage ? (
-                        firstImage.includes('#vid') ? (
-                          <video src={firstImage} className="history-tile-img" autoPlay loop muted playsInline />
-                        ) : (
-                          <img src={firstImage} alt="History" className="history-tile-img" loading="lazy" />
-                        )
-                      ) : (
-                        <div className="history-tile-placeholder">
-                          <Activity size={18} color="#48484a" />
+                    return (
+                      <div key={m.id} className="history-date-group">
+                        <h4 className="history-date-header-v2">{dateHeader}</h4>
+                        <div className="history-visual-grid" style={{ gridTemplateColumns: '1fr' }}>
+                          <div className={`history-visual-tile ${m.status}`} onClick={() => m.status === 'pending' && onEditMission(m)}>
+                            {firstImage ? (
+                              firstImage.includes('#vid') ? (
+                                <video src={firstImage} className="history-tile-img" autoPlay loop muted playsInline />
+                              ) : (
+                                <img src={firstImage} alt="History" className="history-tile-img" loading="lazy" />
+                              )
+                            ) : (
+                              <div className="history-tile-placeholder">
+                                <Activity size={18} color="#48484a" />
+                              </div>
+                            )}
+                            <div className="history-tile-overlay">
+                              <span className="history-tile-type">{m.type === '개인 러닝' ? '개인 러닝' : `인증 ${m.week}주차`}</span>
+                              <span className="history-tile-record-summary">{recordSummary}</span>
+                            </div>
+                            {m.status === 'pending' ? (
+                              <button
+                                className="history-tile-edit-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditMission(m);
+                                }}
+                              >
+                                <Edit2 size={10} />
+                                수정
+                              </button>
+
+                            ) : (
+                              <div className={`history-tile-status-dot ${m.status}`} />
+                            )}
+                          </div>
                         </div>
-                      )}
-                      <div className="history-tile-overlay">
-                        <span className="history-tile-type">{m.type === '개인 러닝' ? '개인 러닝' : `인증 ${m.week}주차`}</span>
-                        <span className="history-tile-record-summary">{recordSummary}</span>
                       </div>
-                      {m.status === 'pending' ? (
-                        <button
-                          className="history-tile-edit-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEditMission(m);
-                          }}
-                        >
-                          <Edit2 size={10} />
-                          수정
-                        </button>
-
-                      ) : (
-                        <div className={`history-tile-status-dot ${m.status}`} />
-                      )}
-                    </div>
+                    );
+                  });
+                })() : (
+                  <div className="empty-history-premium py-40">
+                    <p className="text-gray-700 font-14">아직 인증된 기록이 없습니다.</p>
                   </div>
-                </div>
-              );
-            });
-          })() : (
-            <div className="empty-history-premium py-40">
-              <p className="text-gray-700 font-14">아직 인증된 기록이 없습니다.</p>
-            </div>
+                )}
+              </div>
+            </motion.div>
           )}
-        </div>
+        </AnimatePresence>
 
 
         <div className="px-20 mt-12 flex flex-col gap-10">
@@ -1441,7 +1505,10 @@ const DistanceExtractor = ({ onExtract, onImageSelect, distance, setDistance, is
               inputMode="decimal"
               className="distance-input-premium no-spinner"
               value={distance}
-              onChange={(e) => setDistance(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === '' || /^\d*\.?\d{0,2}$/.test(v)) setDistance(v);
+              }}
               onFocus={(e) => e.target.select()}
             />
             <span className="text-green font-24 bold italic">km</span>
@@ -1680,7 +1747,7 @@ const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initi
           <div className="animate-fadeIn mt-60 mb-40">
             <h3 className="text-white font-18 bold mb-24">챌린지 기록</h3>
 
-            {challenge?.week === 1 || (challenge?.recordFields && challenge.recordFields.some(f => f.category)) ? (
+            {((challenge?.recordFields && challenge.recordFields.some(f => f.category)) || (currentWeek === 1 && !challenge)) ? (
               <div className="mission-selector-container">
                 <p className="text-gray-500 font-13 mb-8">수행하신 미션을 선택해 주세요.</p>
                 {['personal', 'strength', 'team'].map(cat => {
