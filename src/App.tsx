@@ -2995,8 +2995,9 @@ const App: React.FC = () => {
       setMissions(allMissionList);
 
       // 4. Set currentPeriod to the group's active week or latest challenge week
-      if (challengeList.length > 0) {
-        const latestWeek = Math.max(...challengeList.map((c: any) => c.week));
+      const finalChallenges = challengeList && challengeList.length > 0 ? challengeList : [];
+      if (finalChallenges.length > 0) {
+        const latestWeek = Math.max(...finalChallenges.map((c: any) => c.week));
         const groupActiveWeek = groupList[0]?.activeWeek;
         setCurrentPeriod(groupActiveWeek || latestWeek);
       }
