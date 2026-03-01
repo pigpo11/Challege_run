@@ -142,6 +142,14 @@ export async function getGroupById(id: string) {
     return data;
 }
 
+export async function updateGroupActiveWeek(groupId: string, week: number) {
+    const { error } = await supabase
+        .from('groups')
+        .update({ active_week: week })
+        .eq('id', groupId);
+    if (error) throw error;
+}
+
 export async function getMyGroups(profileId: string) {
     const { data } = await supabase
         .from('group_members')
@@ -149,7 +157,8 @@ export async function getMyGroups(profileId: string) {
         .eq('profile_id', profileId);
     return (data || []).map((gm: any) => ({
         ...gm.groups,
-        myRole: gm.role
+        myRole: gm.role,
+        activeWeek: gm.groups?.active_week || 1
     }));
 }
 
@@ -565,7 +574,8 @@ export async function getAllGroups() {
         leaderId: g.leader_id,
         inviteCode: g.invite_code,
         totalScore: g.total_score || 0,
-        totalDistance: Number(g.total_distance) || 0
+        totalDistance: Number(g.total_distance) || 0,
+        activeWeek: g.active_week || 1
     }));
 }
 

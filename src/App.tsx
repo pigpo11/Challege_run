@@ -13,6 +13,7 @@ type Group = {
   inviteCode: string;
   totalScore: number;
   totalDistance: number;
+  activeWeek?: number;
 };
 
 type Team = {
@@ -2993,11 +2994,11 @@ const App: React.FC = () => {
       const allMissionList = await db.getAllMissions();
       setMissions(allMissionList);
 
-      // 4. Set currentPeriod to the latest challenge week or persisted week
+      // 4. Set currentPeriod to the group's active week or latest challenge week
       if (challengeList.length > 0) {
         const latestWeek = Math.max(...challengeList.map((c: any) => c.week));
-        const storedWeek = localStorage.getItem(`active_week_${groupList[0]?.id || 'global'}`);
-        setCurrentPeriod(storedWeek ? parseInt(storedWeek) : latestWeek);
+        const groupActiveWeek = groupList[0]?.activeWeek;
+        setCurrentPeriod(groupActiveWeek || latestWeek);
       }
 
     } catch (e) {
@@ -3832,9 +3833,17 @@ const App: React.FC = () => {
             onUpdate={updateChallenge}
             onDelete={deleteChallenge}
             currentWeek={currentPeriod}
-            onActivate={(w) => {
+            onActivate={async (w) => {
               setCurrentPeriod(w);
-              if (userGroupId) localStorage.setItem(`active_week_${userGroupId}`, w.toString());
+              if (userGroupId) {
+                try {
+                  await db.updateGroupActiveWeek(userGroupId, w);
+                  // Optionally update the groups state locally too
+                  setGroups(prev => prev.map(g => g.id === userGroupId ? { ...g, activeWeek: w } : g));
+                } catch (e) {
+                  console.error('Failed to sync active week to DB:', e);
+                }
+              }
             }}
           />
         );
