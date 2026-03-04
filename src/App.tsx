@@ -154,7 +154,7 @@ const calculateTeamMissionPoints = (missions: Mission[], teamId: string, challen
     validTeamMissions.forEach((tm: any) => {
       let score = 0;
       const pc = parseInt(tm.records?.participantCount || '1');
-      if (pc >= 4) score = 45;
+      if (pc >= 3) score = 45;
       else if (pc >= 2) score = 20;
       else score = 4;
       weeklySum += score;
@@ -683,7 +683,7 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
                               <Trophy size={18} className="text-green" />}
                           <span className="category-name">{cat === 'personal' ? '개인' : cat === 'strength' ? '스트렝스' : '팀 미션'}</span>
                         </div>
-                        {cat === 'team' && <span className="category-reward-badge">1인 <b>4P</b> / 2인 <b>20P</b> / 4인 <b>45P</b></span>}
+                        {cat === 'team' && <span className="category-reward-badge">1인 <b>4P</b> / 2인 <b>20P</b> / 4인/3인 <b>45P</b></span>}
                         {cat === 'personal' && <span className="category-reward-badge">2개 <b>7P</b> / 1개 <b>3P</b></span>}
                         {cat === 'strength' && <span className="category-reward-badge">모두 수행시 <b>10P</b></span>}
                       </div>
@@ -724,7 +724,7 @@ const HomeView = ({ group, allGroups, groupMemberMappings, team, missions, userI
                                     {m.title || m.label}
                                     {status !== 'none' && pCount && (
                                       <span className="text-green ml-4">
-                                        ({pCount}인{pCount === '2' && partnerName ? `: ${partnerName}` : ''})
+                                        ({pCount === '4' ? '4인/3인' : `${pCount}인`}{pCount === '2' && partnerName ? `: ${partnerName}` : ''})
                                       </span>
                                     )}
                                   </p>
@@ -1682,7 +1682,7 @@ const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initi
         </div>
         <p className="text-gray-500 font-14 leading-relaxed">
           {isGroup
-            ? <>챌린지 인증 사진/영상을 추가해 주세요.<br />그룹장의 승인 후에 커뮤니티에 업로드 됩니다.⚡️</>
+            ? <>챌린지 인증 사진/영상을 추가해 주세요.<br />인증 즉시 커뮤니티에 공유되며, 점수가 즉시 반영됩니다.⚡️</>
             : <>거리가 포함된 러닝 인증 사진/영상을 추가해 주세요.<br />인식된 거리는 마일리지에 즉시 반영됩니다.⚡️</>
           }
 
@@ -1784,7 +1784,7 @@ const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initi
                                 <p className="mission-sub">{item.sub}</p>
                               </div>
                               {isAlreadySubmitted && (
-                                <span className="bg-white/10 text-gray-400 font-10 bold px-6 py-2 rounded-4">제출됨</span>
+                                <span className="bg-white/10 text-gray-400 font-10 bold px-6 py-2 rounded-4 whitespace-nowrap">제출됨</span>
                               )}
                             </div>
 
@@ -1803,7 +1803,7 @@ const MissionInputView = ({ onBack, onSubmit, onToast, isGroup, challenge, initi
                                         setRecords({ ...records, ...updates });
                                       }}
                                     >
-                                      {num}인
+                                      {num === 4 ? '4인/3인' : `${num}인`}
                                     </div>
                                   ))}
                                 </div>
@@ -2425,9 +2425,6 @@ const BonusPointsInput = ({ initialValue, onUpdate }: { initialValue: number, on
 const LeaderView = ({
   group,
   teams,
-  missions,
-  approveMission,
-  rejectMission,
   addTeam,
   renameTeam,
   deleteTeam,
@@ -2436,14 +2433,10 @@ const LeaderView = ({
   kickMember,
   updateTeamPoints,
   allMembers,
-  onDeleteGroup,
-  challenges
+  onDeleteGroup
 }: {
   group: Group,
   teams: Team[],
-  missions: Mission[],
-  approveMission: (id: string) => void,
-  rejectMission: (id: string) => void,
   addTeam: () => void,
   renameTeam: (teamId: string, newName: string) => void,
   deleteTeam: (teamId: string) => void,
@@ -2452,22 +2445,18 @@ const LeaderView = ({
   kickMember: (name: string) => void,
   updateTeamPoints: (teamId: string, pts: number) => void,
   allMembers: string[],
-  onDeleteGroup: (id: string) => void,
-  challenges: WeeklyChallenge[]
+  onDeleteGroup: (id: string) => void
 }) => {
-  const [adminTab, setAdminTab] = useState<'approval' | 'teams' | 'members'>('approval');
+  const [adminTab, setAdminTab] = useState<'teams' | 'members'>('teams');
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [tempName, setTempName] = useState('');
   const [showMemberSelect, setShowMemberSelect] = useState<string | null>(null);
   const [showTeamMenu, setShowTeamMenu] = useState<string | null>(null);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
-  const pendingMissions = missions.filter(m => m.status === 'pending' && m.groupId === group.id);
   const groupTeams = teams.filter(t => t.groupId === group.id);
   const assignedMembers = groupTeams.flatMap(t => t.members);
   const availableMembers = allMembers.filter(m => !assignedMembers.includes(m));
-
-  // 실제 missions 데이터에서 멤버별 최신 기록을 동적으로 집계
 
   const handleStartRename = (teamId: string, name: string) => {
     setEditingTeamId(teamId);
@@ -2480,118 +2469,7 @@ const LeaderView = ({
     setEditingTeamId(null);
   };
 
-  const renderApprovalTab = () => (
-    <div className="admin-content-fade">
-      <h4 className="text-gray-700 font-12 bold uppercase tracking-widest mb-16 px-16">미션 승인 대기 ({pendingMissions.length})</h4>
-      <div className="flex flex-col gap-12 px-16">
-        {pendingMissions.map(m => {
-          const missionTeam = teams.find(t => t.id === m.teamId);
-          const teamName = missionTeam ? missionTeam.name : '개인';
 
-          return (
-            <div key={m.id} className="card admin-approve-card-v2 animate-fadeIn">
-              <div className="flex flex-col gap-4 mb-20">
-                <span className="text-green font-11 bold uppercase tracking-widest">{m.type}</span>
-                <h3 className="text-white font-22 bold tracking-tight">
-                  {teamName} <span className="text-gray-400 font-18 ml-4">|</span> <span className="ml-4">{m.userName}</span>
-                </h3>
-              </div>
-
-              <div className="grid-horizontal-records mb-20">
-                {(() => {
-                  const challenge = challenges.find(c => c.week === m.week);
-                  const mId = m.records?.missionId;
-                  let missionTitle = "";
-
-                  if (mId) {
-                    const field = challenge?.recordFields?.find(f => f.id === mId);
-                    if (field) missionTitle = field.label;
-                    else {
-                      // Fallback to WEEK1_STRUCTURE
-                      const allW1 = [...WEEK1_STRUCTURE.personal, ...WEEK1_STRUCTURE.strength, ...WEEK1_STRUCTURE.team];
-                      const w1Field = allW1.find(f => f.id === mId);
-                      if (w1Field) missionTitle = w1Field.title;
-                    }
-                  }
-
-                  const entries = Object.entries(m.records || {}).filter(([key, val]) => {
-                    const k = key.toLowerCase();
-                    if (k === 'missionid' || k === 'category') return false;
-                    if (val === "00'00\"" || val === "") return false;
-                    return true;
-                  });
-
-                  return (
-                    <>
-                      {missionTitle && (
-                        <div className="record-display-item full-width">
-                          <span className="text-gray-500 font-11 bold uppercase tracking-widest mb-4">선택 미션</span>
-                          <span className="text-white font-20 bold tracking-tight">{missionTitle}</span>
-                        </div>
-                      )}
-                      {entries.map(([key, val]) => {
-                        const fieldInfo = challenge?.recordFields?.find(f => f.id === key);
-                        let displayKey = fieldInfo ? fieldInfo.label : key;
-
-                        if (key.toLowerCase() === 'participantcount') displayKey = '참가 인원';
-                        if (key.toLowerCase() === 'partnername') displayKey = '함께한 멤버';
-                        const displayVal = key.toLowerCase() === 'participantcount' ? `${val}인` : String(val);
-
-                        return (
-                          <div className="record-display-item" key={key}>
-                            <span className="text-gray-500 font-11 bold uppercase tracking-widest mb-4">{displayKey}</span>
-                            <span className="text-white font-20 bold tracking-tight">{displayVal}</span>
-                          </div>
-                        );
-                      })}
-                    </>
-                  );
-                })()}
-              </div>
-
-              {m.images && m.images.length > 0 && (
-                <div className="flex flex-col gap-12">
-                  <div className="flex items-center gap-8 mb-4">
-                    <Camera size={14} className="text-gray-600" />
-                    <span className="text-gray-600 font-12 bold">인증 자료 ({m.images.length})</span>
-                  </div>
-                  <div className="grid grid-cols-1 gap-12">
-                    {m.images.map((img, i) => (
-                      <div key={i} className="mb-8">
-                        {img.includes('#vid') ? (
-                          <video src={db.getProxiedUrl(img)} className="mission-approve-img-square" autoPlay loop muted playsInline />
-                        ) : (
-                          <ImageWithFallback src={img} alt="Mission" className="mission-approve-img-square" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-12 mt-24">
-                <button className="btn-reject-v2 flex-1" onClick={() => rejectMission(m.id)}>
-                  <X size={18} strokeWidth={3} />
-                  <span>미승인</span>
-                </button>
-                <button className="btn-approve-v2 flex-1" onClick={() => approveMission(m.id)}>
-                  <Check size={18} strokeWidth={3} />
-                  <span>승인하기</span>
-                </button>
-              </div>
-            </div>
-          );
-        })}
-
-        {pendingMissions.length === 0 && (
-          <div className="empty-state-card py-40">
-            <Shield size={32} className="text-gray-800 mb-12" />
-            <p className="text-gray-800 font-13">대기 중인 미션이 없습니다.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
 
   const renderTeamsTab = () => (
     <div className="admin-content-fade pb-60">
@@ -2815,12 +2693,6 @@ const LeaderView = ({
       {/* Sub-Tabs Navigation */}
       <div className="admin-sub-tabs px-16 mb-24">
         <button
-          className={`admin-sub-tab-btn ${adminTab === 'approval' ? 'active' : ''}`}
-          onClick={() => setAdminTab('approval')}
-        >
-          승인 대기
-        </button>
-        <button
           className={`admin-sub-tab-btn ${adminTab === 'teams' ? 'active' : ''}`}
           onClick={() => setAdminTab('teams')}
         >
@@ -2834,7 +2706,6 @@ const LeaderView = ({
         </button>
       </div>
 
-      {adminTab === 'approval' && renderApprovalTab()}
       {adminTab === 'teams' && renderTeamsTab()}
       {adminTab === 'members' && renderMembersTab()}
     </div>
@@ -3326,20 +3197,6 @@ const App: React.FC = () => {
     }
   };
 
-  // ============================================
-  // Missions (Supabase-backed)
-  // ============================================
-  const approveMission = async (missionId: string) => {
-    const newList = missions.map((m: any) => m.id === missionId ? { ...m, status: 'approved' } : m);
-    setMissions(newList);
-    try {
-      await db.approveMission(missionId);
-      if (profileId) await syncUserMileage(profileId, newList);
-    } catch (e) {
-      console.error('Failed to approve mission:', e);
-    }
-  };
-
   const submitMissionHandler = async (records: any, photos: string[], distance: string) => {
     if (!profileId || isSubmitting) return;
     setIsSubmitting(true);
@@ -3450,7 +3307,7 @@ const App: React.FC = () => {
         userName: userInfo.name,
         week: currentPeriod,
         type: isIndividual ? '개인 러닝' : '챌린지 인증',
-        status: isIndividual ? 'approved' : 'pending',
+        status: 'approved',
         records,
         distance: addedDist,
         images: uploadedPhotos
@@ -3934,9 +3791,6 @@ const App: React.FC = () => {
         <LeaderView
           group={currentGroup}
           teams={teams}
-          missions={missions}
-          approveMission={approveMission}
-          rejectMission={deleteMission}
           addTeam={addTeam}
           renameTeam={renameTeam}
           deleteTeam={deleteTeam}
@@ -3946,7 +3800,6 @@ const App: React.FC = () => {
           updateTeamPoints={handleUpdateTeamPoints}
           allMembers={groupMembers}
           onDeleteGroup={deleteGroup}
-          challenges={challenges}
         />
       ) : <div className="empty-state-fit py-100 flex-center flex-col"><Shield size={48} className="text-gray-800 mb-16" /><p className="text-gray">그룹에 가입되어 있지 않습니다.</p><button className="btn-primary mt-20" onClick={() => setShowOnboarding(true)}>그룹 가입/생성하기</button></div>;
       default: return <HomeView
